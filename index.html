@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>5MT Copy Server</title>
 <meta name="description" content="Self-hosted copy trading server for MetaTrader 5. One master, many slaves, any broker.">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-2 -2 28 28'%3E%3Cpath fill-rule='evenodd' fill='%23fff' stroke='%23000' stroke-width='3' stroke-linejoin='round' paint-order='stroke' d='M11.5144 1.12584C11.8164 0.958052 12.1836 0.958052 12.4856 1.12584L21.4845 6.12522C21.8125 6.31781 22 6.64568 22 7V17C22 17.3632 21.8031 17.6978 21.4856 17.8742L12.4856 22.8742C12.1791 23.0445 11.8059 23.0416 11.5022 22.8673L2.51436 17.874C2.19689 17.6977 2 17.3631 2 16.9999V7C2 6.64568 2.18749 6.3177 2.49287 6.13802L11.5144 1.12584ZM12.0001 10.856L5.05923 6.99995L12 3.14396L18.9409 7L12.0001 10.856ZM4 8.69951V16.4115L11 20.3004V12.5884L4 8.69951ZM13 12.5884V20.3005L20 16.4116V8.69951L13 12.5884Z'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="cube.svg">
 <style>
   * { box-sizing: border-box; }
   body {
@@ -40,6 +40,8 @@
   .qr svg { display: block; border: 1px solid #000; padding: 8px; background: #fff; }
   .btn.tg { background: #229ED9; border-color: #229ED9; color: #fff; }
   .btn.tg:hover { background: #1c8bc0; border-color: #1c8bc0; }
+  .demo { margin: 0; border: 1px solid #000; }
+  .demo video, .demo img { display: block; width: 100%; height: auto; }
   .muted { color: #666; }
   footer { color: #666; }
 
@@ -63,6 +65,23 @@
   </svg>
   5MT Copy Server <small>by 5MTrader</small>
 </h1>
+
+<figure class="demo">
+  <video id="demo" poster="demo-poster.jpg" width="1440" height="904"
+    muted loop playsinline preload="none" aria-label="5MT Copy Server web panel demo"></video>
+</figure>
+<script>
+  // Download the whole video first, then start playing it muted.
+  fetch("demo.mp4")
+    .then(r => r.ok ? r.blob() : Promise.reject())
+    .then(b => {
+      const v = document.getElementById("demo");
+      v.muted = true;
+      v.src = URL.createObjectURL(b);
+      v.play().catch(() => {});
+    })
+    .catch(() => {});
+</script>
 
 <fieldset>
   <legend>what</legend>
