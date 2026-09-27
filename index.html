@@ -3,24 +3,81 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>5MT Copy Server</title>
-<meta name="description" content="Self-hosted copy trading server for MetaTrader 5. One master, many slaves, any broker.">
+<title>5MT Copy Server: Self-Hosted MT5 Copy Trading Server</title>
+<meta name="description" content="Self-hosted copy trading server for MT5. Copy trades from one master MT5 account to many slaves on any broker, in about one second. No terminal, no EA, no Windows VPS.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#ffffff">
+<link rel="canonical" href="https://5mtrader.com/">
 <link rel="icon" type="image/svg+xml" href="cube.svg">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="5MT Copy Server">
+<meta property="og:url" content="https://5mtrader.com/">
+<meta property="og:title" content="5MT Copy Server: Self-Hosted MT5 Copy Trading Server">
+<meta property="og:description" content="Copy trades from one master MT5 account to many slaves on any broker. Runs on your own server, managed from a web page.">
+<meta property="og:image" content="https://5mtrader.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="5MT Copy Server web panel copying trades between MT5 accounts">
+<meta property="og:video" content="https://5mtrader.com/demo.mp4">
+<meta property="og:video:type" content="video/mp4">
+<meta property="og:video:width" content="1440">
+<meta property="og:video:height" content="904">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="5MT Copy Server: Self-Hosted MT5 Copy Trading Server">
+<meta name="twitter:description" content="Copy trades from one master MT5 account to many slaves on any broker. Runs on your own server, managed from a web page.">
+<meta name="twitter:image" content="https://5mtrader.com/og-image.jpg">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "5MT Copy Server",
+      "url": "https://5mtrader.com/",
+      "description": "Self-hosted copy trading server for MT5. Copies market and pending orders, SL/TP, partial closes and modifications from one master account to many slave accounts on any broker.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Linux, Docker",
+      "image": "https://5mtrader.com/og-image.jpg",
+      "screenshot": "https://5mtrader.com/demo-poster.jpg",
+      "offers": {
+        "@type": "Offer",
+        "price": "1000",
+        "priceCurrency": "USD",
+        "description": "One-time payment in USDT (TRC20), lifetime access to the private source repository.",
+        "availability": "https://schema.org/InStock",
+        "url": "https://5mtrader.com/"
+      }
+    },
+    {
+      "@type": "VideoObject",
+      "name": "5MT Copy Server demo",
+      "description": "Trades opened on a master MT5 account copied to slave accounts on other brokers.",
+      "thumbnailUrl": "https://5mtrader.com/demo-poster.jpg",
+      "contentUrl": "https://5mtrader.com/demo.mp4",
+      "uploadDate": "2026-09-27",
+      "duration": "PT25S"
+    }
+  ]
+}
+</script>
 <style>
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: 32px; background: #fff; color: #000;
     font: 13px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   }
-  main { max-width: 720px; margin: 6vh auto; display: flex; flex-direction: column; gap: 24px; }
+  main { max-width: 600px; margin: 12vh auto; display: flex; flex-direction: column; gap: 24px; }
   h1 { margin: 0; font-size: 24px; font-weight: normal; display: flex; gap: 12px; align-items: center; }
   h1 svg { display: block; flex: none; }
-  h1 small { font-size: 13px; color: #666; }
+  .subtitle { margin-top: 8px; color: #666; }
   p { margin: 0; }
   p + p, ul + p, ol + p { margin-top: 10px; }
   p + ul, p + ol { margin-top: 4px; }
   fieldset { border: 1px solid #000; padding: 14px 18px 18px; margin: 0; min-inline-size: 0; min-width: 0; }
   legend { padding: 0 8px; }
+  h2 { margin: 0; font: inherit; }
   ul, ol { margin: 0; padding-left: 20px; }
   li + li { margin-top: 4px; }
   a { color: inherit; }
@@ -47,7 +104,7 @@
 
   @media (max-width: 640px) {
     body { padding: 16px; }
-    main { margin-top: 4vh; }
+    main { margin-top: 8vh; }
     h1 { font-size: 20px; gap: 10px; flex-wrap: wrap; }
     h1 svg { width: 28px; height: 28px; }
     .form { grid-template-columns: 1fr; gap: 4px 0; }
@@ -59,16 +116,21 @@
 <body>
 <main>
 
+<header>
 <h1>
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 28 28" width="36" height="36" fill="none" aria-hidden="true">
     <path fill-rule="evenodd" clip-rule="evenodd" fill="#ffffff" stroke="#000000" stroke-width="3" stroke-linejoin="round" paint-order="stroke" d="M11.5144 1.12584C11.8164 0.958052 12.1836 0.958052 12.4856 1.12584L21.4845 6.12522C21.4921 6.12942 21.4996 6.13372 21.5071 6.13813C21.8125 6.31781 22 6.64568 22 7V17C22 17.3632 21.8031 17.6978 21.4856 17.8742L12.4856 22.8742C12.1791 23.0445 11.8059 23.0416 11.5022 22.8673L2.51436 17.874C2.19689 17.6977 2 17.3631 2 16.9999V7C2 6.64568 2.18749 6.3177 2.49287 6.13802L2.5073 6.13784L2.51436 6.12584L11.5144 1.12584ZM12.0001 10.856L5.05923 6.99995L12 3.14396L18.9409 7L12.0001 10.856ZM4 8.69951V16.4115L11 20.3004V12.5884L4 8.69951ZM13 12.5884V20.3005L20 16.4116V8.69951L13 12.5884Z"/>
   </svg>
-  5MT Copy Server <small>by 5MTrader</small>
+  5MT Copy Server
 </h1>
+<p class="subtitle">Self-hosted copy trading server for MT5. 速度に取り憑かれている。
+</p>
+</header>
 
 <figure class="demo">
   <video id="demo" poster="demo-poster.jpg" width="1440" height="904"
     muted loop playsinline preload="none" aria-label="5MT Copy Server web panel demo"></video>
+  <noscript><img src="demo-poster.jpg" width="1440" height="904" alt="5MT Copy Server web panel copying trades from a master MT5 account to slave accounts"></noscript>
 </figure>
 <script>
   // Download the whole video first, then start playing it muted.
@@ -84,8 +146,8 @@
 </script>
 
 <fieldset>
-  <legend>what</legend>
-  <p><b>Self-hosted copy trading server for MetaTrader 5.</b></p>
+  <legend><h2>what</h2></legend>
+  <p><b>Self-hosted copy trading server for MT5.</b></p>
   <p>How it works:</p>
   <ol>
     <li>Connect your MT5 accounts.</li>
@@ -102,7 +164,7 @@
 </fieldset>
 
 <fieldset>
-  <legend>features</legend>
+  <legend><h2>features</h2></legend>
   <ul>
     <li>Market and pending orders, SL/TP, partial closes, modifications.</li>
     <li>Lot multiplier or fixed lot, clamped to broker limits.</li>
@@ -115,7 +177,7 @@
 </fieldset>
 
 <fieldset>
-  <legend>get it</legend>
+  <legend><h2>get it</h2></legend>
   <p class="price">$2,500 USDT <span class="muted">one-time, lifetime access</span></p>
   <p>You get access to the private GitHub repository with the full source code and
   step-by-step instructions to set everything up.</p>
