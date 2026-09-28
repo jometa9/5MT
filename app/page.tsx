@@ -35,7 +35,8 @@ export default function Home() {
           </svg>
           5MT Copy Server
         </h1>
-        <p className="subtitle">Self-hosted copy trading server for MT5. 速度に取り憑かれている。</p>
+        <p className="subtitle">Self-hosted copy trading server for MT5.</p>
+        <p className="subtitle">速度に取り憑かれている。</p>
       </header>
 
       <PanelDemo />
@@ -96,6 +97,10 @@ export default function Home() {
           <a className="btn tg" id="telegram" href="https://t.me/jometayer" target="_blank" rel="noopener">Contact on Telegram</a>
         </div>
       </fieldset>
+
+      <footer>
+        by <a href="https://github.com/jometa9" target="_blank" rel="noopener">https://github.com/jometa9</a>
+      </footer>
     </main>
   );
 }

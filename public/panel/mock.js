@@ -2,11 +2,20 @@
 // 5MTrader-MT5-API/wwwroot/index.html; this script replaces fetch and EventSource so it runs
 // on simulated accounts: a master trades on its own and the slaves copy it about 1s later.
 (() => {
-  const SYMBOL = 'BTCUSD';
   const MASTER_PATH = '/mt5/FTMO-Demo/1514761741';
   const r2 = (n) => Math.round(n * 100) / 100;
 
-  let price = 84436.5;
+  // One symbol is active at a time; its full cycle (open -> modify -> partial -> close) finishes
+  // before the next symbol starts, so an account never holds more than 4 orders at once.
+  const SYMBOLS = ['BTCUSD', 'EURUSD', 'XAUUSD'];
+  const DECIMALS = { BTCUSD: 2, EURUSD: 5, XAUUSD: 2 };
+  const CONTRACT = { BTCUSD: 1, EURUSD: 100000, XAUUSD: 100 };
+  const ANCHOR = { BTCUSD: 84436.5, EURUSD: 1.085, XAUUSD: 2650.0 };
+  const VOL = { BTCUSD: 14, EURUSD: 0.0006, XAUUSD: 1.2 };
+
+  const prices = { ...ANCHOR };
+  const rr = (n, symbol) => { const f = 10 ** DECIMALS[symbol]; return Math.round(n * f) / f; };
+  const off = (symbol, ratio) => rr(prices[symbol] * ratio, symbol);
 
   function config(role, lotMultiplier) {
     const c = { role, copyEnabled: true };
@@ -46,7 +55,8 @@
 
   function profit(o) {
     if (o.type !== 'market') return 0;
-    return (o.side === 'buy' ? price - o.price : o.price - price) * o.volume;
+    const diff = o.side === 'buy' ? prices[o.symbol] - o.price : o.price - prices[o.symbol];
+    return diff * o.volume * CONTRACT[o.symbol];
   }
 
   // ---- trading operations, applied first to the master and then to each slave ----
@@ -60,8 +70,8 @@
       const side = flip ? (op.side === 'buy' ? 'sell' : 'buy') : op.side;
       const withSlTp = a === master || c.copySlTp;
       a.orders.push({
-        ticket: a === master ? op.mt : a.nextTicket, mt: op.mt, type: op.type, side,
-        volume: lots(a, op.volume), price: op.type === 'market' ? price : op.price,
+        ticket: a === master ? op.mt : a.nextTicket, mt: op.mt, symbol: op.symbol, type: op.type, side,
+        volume: lots(a, op.volume), price: op.type === 'market' ? prices[op.symbol] : op.price,
         sl: withSlTp && !flip ? op.sl : null, tp: withSlTp && !flip ? op.tp : null, openedAt: Date.now(),
       });
       a.nextTicket++;
@@ -82,29 +92,47 @@
     }
   }
 
-  // One round of master activity; prices are taken relative to the market when each step runs.
-  function round() {
-    let mkt = 0, lim = 0, stp = 0;
+  // One round of master activity on a single symbol; at most 4 orders are open at once
+  // (market buy, pending limit, pending stop, market sell) before the round closes them all.
+  function round(symbol) {
+    let mkt = 0, lim = 0, stp = 0, mkt2 = 0;
     return [
-      () => ({ k: 'open', mt: (mkt = master.nextTicket), type: 'market', side: 'buy', volume: 0.1, sl: null, tp: null }),
-      () => ({ k: 'open', mt: (lim = master.nextTicket), type: 'limit', side: 'buy', volume: 0.07,
-               price: r2(price - 60), sl: r2(price - 110), tp: r2(price + 120) }),
-      () => ({ k: 'modify', mt: mkt, sl: r2(price - 80), tp: r2(price + 150) }),
-      () => ({ k: 'open', mt: (stp = master.nextTicket), type: 'stop', side: 'sell', volume: 0.05,
-               price: r2(price - 90), sl: r2(price - 40), tp: r2(price - 200) }),
-      () => ({ k: 'open', mt: master.nextTicket, type: 'market', side: 'sell', volume: 0.07, sl: null, tp: null }),
+      () => ({ k: 'open', mt: (mkt = master.nextTicket), symbol, type: 'market', side: 'buy', volume: 0.1, sl: null, tp: null }),
+      () => ({ k: 'open', mt: (lim = master.nextTicket), symbol, type: 'limit', side: 'buy', volume: 0.07,
+               price: rr(prices[symbol] - off(symbol, 0.00071), symbol), sl: rr(prices[symbol] - off(symbol, 0.0013), symbol), tp: rr(prices[symbol] + off(symbol, 0.00142), symbol) }),
+      () => ({ k: 'modify', mt: mkt, sl: rr(prices[symbol] - off(symbol, 0.00095), symbol), tp: rr(prices[symbol] + off(symbol, 0.00178), symbol) }),
+      () => ({ k: 'open', mt: (stp = master.nextTicket), symbol, type: 'stop', side: 'sell', volume: 0.05,
+               price: rr(prices[symbol] - off(symbol, 0.00107), symbol), sl: rr(prices[symbol] - off(symbol, 0.00047), symbol), tp: rr(prices[symbol] - off(symbol, 0.00237), symbol) }),
+      () => ({ k: 'open', mt: (mkt2 = master.nextTicket), symbol, type: 'market', side: 'sell', volume: 0.07, sl: null, tp: null }),
       () => ({ k: 'partial', mt: mkt, volume: 0.05 }),
       () => ({ k: 'close', mt: lim }),
       () => ({ k: 'close', mt: mkt }),
       () => ({ k: 'close', mt: stp }),
-      () => ({ k: 'close', mt: stp + 1 }),
+      () => ({ k: 'close', mt: mkt2 }),
     ];
   }
 
-  let steps = round();
+  let symbolIdx = 0;
+  let currentSymbol = SYMBOLS[symbolIdx];
+  let steps = round(currentSymbol);
   let stepIndex = 0;
+
+  // Prime the demo so it never renders empty: apply the first two "open" steps of the first
+  // symbol immediately (master + copying slaves), then let the timer-driven cycle take over
+  // from the modify step onward.
+  for (let i = 0; i < 2; i++) {
+    const op = steps[stepIndex++]();
+    apply(master, op);
+    for (const a of accounts) if (isCopying(a)) apply(a, op);
+  }
+
   function step() {
-    if (stepIndex === steps.length) { steps = round(); stepIndex = 0; }
+    if (stepIndex === steps.length) {
+      symbolIdx = (symbolIdx + 1) % SYMBOLS.length;
+      currentSymbol = SYMBOLS[symbolIdx];
+      steps = round(currentSymbol);
+      stepIndex = 0;
+    }
     const op = steps[stepIndex++]();
     apply(master, op);
     pushAccounts();
@@ -129,12 +157,12 @@
       balance: r2(a.balance), equity: r2(a.balance + pnl), pnl: r2(pnl),
       open_orders: positions.length, pending_orders: pendings.length,
       open_positions: positions.map((o) => ({
-        ticket: o.ticket, symbol: SYMBOL, type: 'market', side: o.side, volume: o.volume, open_price: o.price,
+        ticket: o.ticket, symbol: o.symbol, type: 'market', side: o.side, volume: o.volume, open_price: o.price,
         sl: o.sl, tp: o.tp, open_time: Math.floor(o.openedAt / 1000), age_seconds: Math.floor((now - o.openedAt) / 1000),
         profit: r2(profit(o)), swap: 0, commission: 0, magic: o.mt,
       })),
       pending_order_list: pendings.map((o) => ({
-        ticket: o.ticket, symbol: SYMBOL, type: o.type, side: o.side, volume: o.volume, price: o.price,
+        ticket: o.ticket, symbol: o.symbol, type: o.type, side: o.side, volume: o.volume, price: o.price,
         sl: o.sl, tp: o.tp, expire: null, magic: o.mt, reduce_only: null,
       })),
       copyTradingConfig: a.config,
@@ -215,7 +243,7 @@
   // ---- market ticks and server stats ----
 
   setInterval(() => {
-    price = r2(price + (Math.random() - 0.5) * 14 + (84450 - price) * 0.02);
+    for (const s of SYMBOLS) prices[s] = rr(prices[s] + (Math.random() - 0.5) * VOL[s] + (ANCHOR[s] - prices[s]) * 0.02, s);
     pushAccounts();
   }, 1000);
 
@@ -225,5 +253,5 @@
     emit('stats', { cpuPercent: 2 + Math.random() * 3, ramPercent, ramUsedBytes: total * ramPercent / 100, ramTotalBytes: total });
   }, 2000);
 
-  setTimeout(step, 2000);
+  setTimeout(step, 3000);
 })();

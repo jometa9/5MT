@@ -32,6 +32,7 @@ export default function PanelDemo() {
             title="5MT Copy Server web panel, live demo with simulated accounts"
             width={W}
             height={H}
+            scrolling="no"
           />
         </BrowserFrame>
       </div>
