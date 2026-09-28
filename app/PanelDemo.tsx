@@ -28,7 +28,7 @@ export default function PanelDemo() {
       <div className="demoScaled" style={{ width: W, transform: `scale(${scale})` }}>
         <BrowserFrame tabTitle="5MT" url="5mt-copy-server.up.railway.app">
           <iframe
-            src="/panel/index.html"
+            src={process.env.BASE_PATH + "/panel/index.html"}
             title="5MT Copy Server web panel, live demo with simulated accounts"
             width={W}
             height={H}

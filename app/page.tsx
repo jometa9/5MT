@@ -11,24 +11,14 @@ const jsonLd = {
       "applicationCategory": "FinanceApplication",
       "operatingSystem": "Linux, Docker",
       "image": "https://5mtrader.com/og-image.jpg",
-      "screenshot": "https://5mtrader.com/demo-poster.jpg",
       "offers": {
         "@type": "Offer",
-        "price": "1000",
+        "price": "2500",
         "priceCurrency": "USD",
         "description": "One-time payment in USDT (TRC20), lifetime access to the private source repository.",
         "availability": "https://schema.org/InStock",
         "url": "https://5mtrader.com/"
       }
-    },
-    {
-      "@type": "VideoObject",
-      "name": "5MT Copy Server demo",
-      "description": "Trades opened on a master MT5 account copied to slave accounts on other brokers.",
-      "thumbnailUrl": "https://5mtrader.com/demo-poster.jpg",
-      "contentUrl": "https://5mtrader.com/demo.mp4",
-      "uploadDate": "2026-09-27",
-      "duration": "PT25S"
     }
   ]
 };
@@ -73,11 +63,11 @@ export default function Home() {
         <ul>
           <li>Market and pending orders, SL/TP, partial closes, modifications.</li>
           <li>Lot multiplier or fixed lot, clamped to broker limits.</li>
-          <li>Reverse trading, symbol prefix/suffix, symbol translations, allow/block filters.</li>
-          <li>Exact match mode: slave mirrors master, stray orders closed.</li>
+          <li>Reverse trading, symbol prefix/suffix, symbol translations, symbol allow/block filters.</li>
+          <li>Exact match mode: the slave mirrors the master and stray orders are closed.</li>
           <li>Reconciles state after restarts and reconnections.</li>
           <li>Password-protected web panel, works on mobile.</li>
-          <li>Deploy on Railway in minutes, or Docker on any server.</li>
+          <li>Deploy on Railway in minutes, or with Docker on any server.</li>
         </ul>
       </fieldset>
 

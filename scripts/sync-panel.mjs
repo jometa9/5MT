@@ -1,5 +1,5 @@
 // Copies the real web panel from the 5MTrader-MT5-API repo into public/panel/,
-// adding only the mock backend script. Run after changing the panel: npm run sync-panel
+// adding only the mock backend script and making asset paths relative (the site may live under a sub-path). Run after changing the panel: npm run sync-panel
 import { readFileSync, writeFileSync } from "node:fs";
 
 const src = new URL("../../5MTrader-MT5-API/wwwroot/index.html", import.meta.url);
@@ -8,5 +8,8 @@ const anchor = "</main>\n<script>\n";
 
 const html = readFileSync(src, "utf8");
 if (html.split(anchor).length !== 2) throw new Error("panel layout changed: cannot find where to inject mock.js");
-writeFileSync(dest, html.replace(anchor, '</main>\n<script src="/panel/mock.js"></script>\n' + anchor.slice(8)));
+const out = html
+  .replace(anchor, '</main>\n<script src="mock.js"></script>\n' + anchor.slice(8))
+  .replaceAll('"/cube.svg"', '"../cube.svg"');
+writeFileSync(dest, out);
 console.log("synced public/panel/index.html");

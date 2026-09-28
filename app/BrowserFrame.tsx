@@ -35,8 +35,8 @@ function useBackgroundTabs() {
   }, []);
 
   return [
-    { icon: "/browser/tv-favicon.ico", title: `EURUSD ${fxTabStats(price)} chart` },
-    { icon: "/browser/icon-ff.ico", title: "Calendar | Forex Factory" },
+    { icon: process.env.BASE_PATH + "/browser/tv-favicon.ico", title: `EURUSD ${fxTabStats(price)} chart` },
+    { icon: process.env.BASE_PATH + "/browser/icon-ff.ico", title: "Calendar | Forex Factory" },
   ];
 }
 
@@ -79,7 +79,7 @@ export default function BrowserFrame({
               background: `radial-gradient(circle at 100% 0, transparent ${TAB_CURVE}px, var(--chrome-toolbar) ${TAB_CURVE}px)`,
             }}
           />
-          <TabIcon src="/cube.svg" />
+          <TabIcon src={process.env.BASE_PATH + "/cube.svg"} />
           <span className="bf-tabTitle">{tabTitle}</span>
           <X className="bf-tabClose" aria-hidden />
         </span>
@@ -106,7 +106,7 @@ export default function BrowserFrame({
           <span className="bf-url">{url}</span>
           <Star className="bf-star" aria-hidden />
         </span>
-        <img src="/browser/avatar.png" alt="" width={28} height={28} aria-hidden className="bf-avatar" />
+        <img src={process.env.BASE_PATH + "/browser/avatar.png"} alt="" width={28} height={28} aria-hidden className="bf-avatar" />
         <MoreVertical className="bf-nav" aria-hidden />
       </div>
       <div className="bf-content">{children}</div>
