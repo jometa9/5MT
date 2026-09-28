@@ -98,8 +98,9 @@ export default function Home() {
         </div>
       </fieldset>
 
-      <footer>
-        by <a href="https://github.com/jometa9" target="_blank" rel="noopener">github.com/jometa9</a>
+      <footer style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+        <img src="https://avatars.githubusercontent.com/u/83543601?v=4" alt="" width={80} height={80} style={{ display: "block", border: "1px solid #000" }} />
+        <span className="subtitle">by <a href="https://github.com/jometa9" target="_blank" rel="noopener">github.com/jometa9</a></span>
       </footer>
     </main>
   );
