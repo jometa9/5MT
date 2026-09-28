@@ -1,0 +1,739 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5MT</title>
+<link rel="icon" href="/cube.svg" type="image/svg+xml">
+<style>
+  * { box-sizing: border-box; }
+  * { -webkit-user-select: none; user-select: none; }
+  input, textarea { -webkit-user-select: text; user-select: text; }
+  body {
+    margin: 0; padding: 32px; background: #fff; color: #000;
+    font: 13px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  main { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+  h1 { margin: 0; font-size: 24px; font-weight: normal; display: flex; gap: 12px; align-items: center; }
+  h1 img { display: block; }
+  h1 button { font-size: 13px; }
+  h1 #addAccountBtn { margin-left: auto; }
+  h2 { margin: 0; font-size: 13px; font-weight: normal; }
+  #msg { margin: 0; min-height: 1.5em; }
+  #msg.err::before { content: "! "; }
+  #msg.idle { color: #666; }
+
+  fieldset { border: 1px solid #000; padding: 14px 18px 18px; margin: 0; min-inline-size: 0; min-width: 0; }
+  legend { padding: 0 8px; display: flex; gap: 10px; align-items: center; }
+
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 4px 8px; border-bottom: 1px solid #000; text-align: left; vertical-align: top; }
+  td.rowActions { white-space: nowrap; }
+  td button { white-space: nowrap; }
+  th { font-weight: normal; }
+  td:nth-child(6), td:nth-child(7), td:nth-child(8), th:nth-child(6), th:nth-child(7), th:nth-child(8) { text-align: right; }
+  tr:last-child td { border-bottom: 0; }
+  .tableWrap { width: 100%; }
+  @keyframes flashRow { 0% { background: rgba(180, 180, 180, 0.5); } 100% { background: transparent; } }
+  #accounts tbody > tr.flash > td { animation: flashRow 1.2s ease-out; }
+  #accounts tr.orders table tbody > tr.flash > td { animation: flashRow 1.2s ease-out; }
+  #accounts { width: 100%; }
+  #accounts tr.orders > td { padding: 0 0 0 24px; border-bottom: 1px solid #000; }
+  #accounts tr.orders table { width: 100%; table-layout: auto; }
+  #accounts tr.orders table th, #accounts tr.orders table td { padding: 2px 8px; border-bottom: 1px dotted #000; }
+  #accounts tr.orders table tr:last-child td { border-bottom: 0; }
+  #accounts tr.orders table th { border-bottom: 1px solid #000; }
+  #accounts tr.orders td:nth-child(n+5), #accounts tr.orders th:nth-child(n+5) { text-align: right; }
+  #accounts tr.orders td:nth-child(1), #accounts tr.orders td:nth-child(2), #accounts tr.orders td:nth-child(3), #accounts tr.orders td:nth-child(4),
+  #accounts tr.orders th:nth-child(1), #accounts tr.orders th:nth-child(2), #accounts tr.orders th:nth-child(3), #accounts tr.orders th:nth-child(4) { text-align: left; }
+  #accounts tr.orders p { margin: 4px 0; }
+  #live { margin-left: 4px; white-space: nowrap; }
+  #live::before { display: inline-block; margin-right: 8px; }
+  #live.off::before { content: "\25CB"; }
+  #live.on::before { content: "\25CF"; }
+  #stats { white-space: nowrap; }
+  #live .short { display: none; }
+
+  .form { display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px; align-items: center; }
+  .form label { display: contents; }
+  .form .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .checks { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 24px; padding: 6px 0; }
+  .checks label { display: flex; gap: 8px; align-items: center; }
+  .actions { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 6px; }
+
+  input, select, textarea, button {
+    font: inherit; color: inherit; background: #fff; border: 1px solid #000; border-radius: 0;
+    padding: 3px 8px; margin: 0;
+  }
+  input[type=text], input[type=number], select, textarea { min-width: 220px; max-width: 100%; }
+  input[type=number] { min-width: 100px; width: 100px; }
+  input[type=checkbox] { width: 14px; height: 14px; margin: 0; accent-color: #000; }
+  textarea { width: 100%; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 1px solid #000; outline-offset: -2px; }
+  button { cursor: pointer; }
+  button:hover { background: #000; color: #fff; }
+  button:disabled { opacity: .4; cursor: default; }
+  td button { padding: 1px 8px; }
+  legend button { padding: 0 8px; }
+  [hidden] { display: none !important; }
+  hr { border: 0; border-top: 1px solid #000; grid-column: 1 / -1; margin: 4px 0; }
+
+  /* Table as cards: below this width the accounts table cannot fit without horizontal scroll. */
+  @media (max-width: 1100px) {
+    /* table as cards */
+    #accounts, #accounts tbody, #accounts tr, #accounts td { display: block; }
+    #accounts thead { display: none; }
+    #accounts tr { border: 1px solid #000; padding: 8px 10px; display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; }
+    #accounts tr + tr { margin-top: 10px; }
+    #accounts td { border: 0; padding: 0; white-space: normal; display: contents; text-align: left; }
+    #accounts td::before { content: attr(data-label); }
+    #accounts td:empty { display: none; }
+    #accounts td.rowActions { display: flex; grid-column: 1 / -1; gap: 8px; margin-top: 8px; }
+    #accounts td.rowActions::before { content: none; }
+    #accounts td.rowActions button { flex: 1 1 auto; padding: 6px 10px; }
+    #accounts tr.orders { display: block; padding: 0; border-top: 0; margin-top: -1px; }
+    #accounts tr.orders > td { display: block; padding: 0 10px; }
+    #accounts tr.orders > td::before { content: none; }
+    #accounts tr.orders table, #accounts tr.orders tbody { display: block; width: 100%; }
+    #accounts tr.orders thead { display: none; }
+    #accounts tr.orders table tr { display: grid; grid-template-columns: max-content 1fr max-content 1fr; gap: 2px 10px; border: 0; padding: 8px 0; margin: 0; border-bottom: 1px dotted #000; }
+    #accounts tr.orders table tr:last-child { border-bottom: 0; }
+    #accounts tr.orders table td, #accounts tr.orders table td:nth-child(n+5) { display: contents; text-align: left; white-space: normal; }
+    #accounts tr.orders table td:empty::after { content: "-"; }
+    #accounts tr.orders table td::before { content: attr(data-label); }
+    #accounts tr.orders p { margin: 8px 0; }
+    /* td is display: contents here, so the flash must animate the tr's own background instead. */
+    #accounts tbody > tr.flash > td { animation: none; }
+    #accounts tbody > tr.flash { animation: flashRow 1.2s ease-out; }
+    #accounts tr.orders table tbody > tr.flash > td { animation: none; }
+    #accounts tr.orders table tbody > tr.flash { animation: flashRow 1.2s ease-out; }
+    #accounts td.rowActions button { flex: 0 1 auto; padding: 4px 14px; }
+  }
+  @media (min-width: 700px) and (max-width: 1100px) {
+    #accounts tr.orders table tr { grid-template-columns: repeat(3, max-content 1fr); }
+  }
+  @media (max-width: 640px) {
+    body { padding: 16px; }
+    main { gap: 16px; }
+    .form > *, .form label > * { min-width: 0; max-width: 100%; }
+    .form .row > * { min-width: 0; }
+    h1 { font-size: 20px; gap: 10px; flex-wrap: wrap; }
+    h1 img { width: 28px; height: 28px; }
+    fieldset { padding: 10px 12px 14px; }
+    legend { flex-wrap: wrap; row-gap: 6px; }
+    #accountsTitle, #live .full { display: none; }
+    #live .short { display: inline; }
+    #accounts td.rowActions button { flex: 1 1 auto; padding: 6px 10px; }
+    .form { grid-template-columns: 1fr; gap: 4px 0; }
+    .form label > span { display: block; margin-top: 8px; }
+    .form .row { gap: 6px; }
+    .checks { grid-template-columns: 1fr; padding: 10px 0 4px; }
+    .actions { margin-top: 12px; flex-wrap: wrap; }
+    .actions button { flex: 1 1 auto; }
+    input, select, textarea, button { font-size: 16px; padding: 6px 10px; }
+    input[type=text], select, textarea { min-width: 0; width: 100%; }
+    input[type=number] { min-width: 0; width: 110px; }
+    input[type=checkbox] { width: 18px; height: 18px; }
+    .form .row input[type=text] { flex: 1 1 140px; width: auto; }
+    .form .row select { width: auto; flex: 1 1 120px; }
+    hr { margin: 12px 0 4px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<h1><img src="/cube.svg" alt="" width="36" height="36">5MT<button id="addAccountBtn" onclick="openAdd()">Add account</button> <button id="logout" onclick="logout()" hidden>logout</button></h1>
+
+<p id="msg" class="idle">All systems running normally.</p>
+
+<fieldset id="addBox" hidden>
+  <legend>Add account</legend>
+  <div class="form">
+    <label><span>Broker search</span>
+      <div class="row">
+        <input type="text" id="brokerQuery" placeholder="ftmo">
+        <button onclick="searchBrokers()">Search</button>
+      </div>
+    </label>
+    <label><span>Server</span>
+      <select id="serverSelect"></select>
+    </label>
+    <label><span>Account id</span><input type="text" id="accountId" placeholder="1234567"></label>
+    <label><span>Password</span><input type="text" id="password"></label>
+    <label><span>Role</span>
+      <select id="newRole">
+        <option value="pending">pending</option>
+        <option value="master">master</option>
+        <option value="slave">slave</option>
+      </select>
+    </label>
+    <div class="actions">
+      <button id="connectBtn" onclick="addAccount()">Connect</button>
+      <button onclick="closeAdd()">Cancel</button>
+    </div>
+  </div>
+</fieldset>
+
+<fieldset id="editBox" hidden>
+  <legend>Edit <span id="editTitle"></span></legend>
+  <div class="form">
+    <label><span>Role</span>
+      <select id="e_role" onchange="toggleSlaveFields()">
+        <option value="pending">pending</option>
+        <option value="master">master</option>
+        <option value="slave">slave</option>
+      </select>
+    </label>
+    <label><span>New password</span><input type="text" id="e_password" placeholder="optional"></label>
+    <div class="checks">
+      <label><input type="checkbox" id="e_copyEnabled" checked> Copy enabled</label>
+    </div>
+  </div>
+
+  <div id="slaveFields" class="form">
+    <hr>
+    <label><span>Master</span>
+      <select id="e_masterSelect" onchange="document.getElementById('e_masterTcpUrl').value = this.value"></select>
+    </label>
+    <input type="hidden" id="e_masterTcpUrl">
+    <label><span>Lot</span>
+      <div class="row">
+        <select id="e_lotType">
+          <option value="multiplier">multiplier</option>
+          <option value="fixed">fixed</option>
+        </select>
+        <span>x</span><input type="number" step="0.01" id="e_lotMultiplier" value="1" title="Lot multiplier">
+        <span>fixed</span><input type="number" step="0.01" id="e_fixedLot" value="0.01" title="Fixed lot">
+      </div>
+    </label>
+    <div class="checks">
+      <label><input type="checkbox" id="e_reverseTrading"> Reverse trading</label>
+      <label><input type="checkbox" id="e_copyPendingOrders" checked> Copy pending orders</label>
+      <label><input type="checkbox" id="e_copySlTp" checked> Copy SL/TP</label>
+      <label><input type="checkbox" id="e_exactMatch"> Exact match</label>
+      <label><input type="checkbox" id="e_noTradeTag"> No trade tag</label>
+    </div>
+    <label><span>Prefix</span>
+      <div class="row">
+        <input type="checkbox" id="e_prefixEnabled"> <input type="text" id="e_prefixValue">
+        <select id="e_prefixAction"><option value="add">add</option><option value="remove">remove</option></select>
+      </div>
+    </label>
+    <label><span>Suffix</span>
+      <div class="row">
+        <input type="checkbox" id="e_suffixEnabled"> <input type="text" id="e_suffixValue">
+        <select id="e_suffixAction"><option value="add">add</option><option value="remove">remove</option></select>
+      </div>
+    </label>
+    <label><span>Symbol translations<br><small>FROM:TO, one per line</small></span>
+      <textarea id="e_symbolTranslations" rows="3"></textarea>
+    </label>
+    <label><span>Symbol filter</span>
+      <div class="row">
+        <select id="e_symbolFilterMode">
+          <option value="off">off</option>
+          <option value="allow">allow</option>
+          <option value="block">block</option>
+        </select>
+        <input type="text" id="e_symbolFilterList" placeholder="EURUSD,XAUUSD">
+      </div>
+    </label>
+  </div>
+
+  <div class="form">
+    <div class="actions">
+      <button onclick="saveEdit()">Save</button>
+      <button onclick="closeEdit()">Cancel</button>
+    </div>
+  </div>
+</fieldset>
+
+<fieldset>
+  <legend><span id="accountsTitle">Accounts</span> <span id="live" class="off">connecting</span> <span id="stats"></span></legend>
+  <div class="tableWrap">
+  <table id="accounts">
+    <thead>
+      <tr>
+        <th>Account</th><th>Server</th><th>Status</th><th>Role</th><th>Master</th>
+        <th>Balance</th><th>Equity</th><th>PnL</th><th>Open/Pend</th><th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  </div>
+</fieldset>
+
+</main>
+<script src="/panel/mock.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let accounts = [];
+let editing = null;
+
+function headers() {
+  return { 'content-type': 'application/json' };
+}
+
+let msgTimer = null;
+function msgIdle() {
+  $('msg').textContent = 'All systems running normally.';
+  $('msg').className = 'idle';
+}
+function msg(text, ok) {
+  clearTimeout(msgTimer);
+  $('msg').textContent = (ok ? 'OK: ' : 'ERROR: ') + text;
+  $('msg').className = ok ? 'ok' : 'err';
+  msgTimer = setTimeout(msgIdle, ok ? 6000 : 15000);
+}
+
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: headers(), body: body ? JSON.stringify(body) : undefined });
+  if (res.status === 401) { location.replace('/login.html'); throw new Error('session expired'); }
+  let json = null;
+  try { json = await res.json(); } catch {}
+  if (!res.ok || !json || !json.success) {
+    const err = (json && json.errors && json.errors[0]) || (json && json.message) || ('HTTP ' + res.status);
+    throw new Error(err);
+  }
+  return json.data;
+}
+
+async function logout() {
+  try { await api('POST', '/api/logout'); } catch {}
+  location.replace('/login.html');
+}
+
+async function checkSession() {
+  try {
+    const s = await api('GET', '/api/session');
+    $('logout').hidden = !s.authRequired;
+  } catch {}
+}
+checkSession();
+
+const COLS = ['Account', 'Server', 'Status', 'Role', 'Master', 'Balance', 'Equity', 'PnL', 'Open/Pend'];
+
+function fmt(n) { return n == null ? '' : Number(n).toFixed(2); }
+
+function findMaster(url) {
+  if (!url) return null;
+  return accounts.find(m => m.role === 'master' && m.tcp_path && url.endsWith(m.tcp_path)) || null;
+}
+
+function masterLabel(url) {
+  if (!url) return '';
+  const m = findMaster(url);
+  if (m) return m.account_id + ' @ ' + m.server;
+  const parts = url.split('/').filter(Boolean);
+  return parts[parts.length - 1] || '';
+}
+
+const expanded = new Set();
+let lastUpdate = null;
+let prevAccountsByKey = new Map();
+let flashAccounts = new Set();
+let flashOrders = new Set();
+
+function accountKey(a) { return a.server + '/' + a.account_id; }
+
+function computeFlashes(list) {
+  flashAccounts.clear();
+  flashOrders.clear();
+  for (const a of list) {
+    const key = accountKey(a);
+    const prev = prevAccountsByKey.get(key);
+    if (!prev) continue;
+    if (prev.open_orders !== a.open_orders || prev.pending_orders !== a.pending_orders
+      || prev.balance !== a.balance || prev.pnl !== a.pnl) flashAccounts.add(key);
+    const prevOrders = new Map();
+    for (const o of (prev.open_positions || [])) prevOrders.set(o.ticket, o);
+    for (const o of (prev.pending_order_list || [])) prevOrders.set(o.ticket, o);
+    for (const o of [...(a.open_positions || []), ...(a.pending_order_list || [])]) {
+      const po = prevOrders.get(o.ticket);
+      if (!po) continue;
+      if (po.price !== o.price || po.open_price !== o.open_price || po.sl !== o.sl || po.tp !== o.tp
+        || po.profit !== o.profit || po.volume !== o.volume || po.swap !== o.swap || po.commission !== o.commission) {
+        flashOrders.add(key + ':' + o.ticket);
+      }
+    }
+  }
+  prevAccountsByKey = new Map(list.map(a => [accountKey(a), a]));
+}
+
+function px(n) { return n == null ? '' : String(n); }
+
+function cell(tr, text, label, cls) {
+  const td = document.createElement('td');
+  td.textContent = text;
+  if (label) td.dataset.label = label;
+  if (cls) td.className = cls;
+  tr.appendChild(td);
+  return td;
+}
+
+const ORDER_COLS = ['Ticket', 'Symbol', 'Type', 'Side', 'Vol', 'Price', 'SL', 'TP', 'Profit', 'Magic'];
+
+function renderOrders(a, accKey) {
+  const wrap = document.createElement('td');
+  wrap.colSpan = COLS.length + 1;
+  const positions = a.open_positions || [];
+  const pendings = a.pending_order_list || [];
+  if (!positions.length && !pendings.length) {
+    const p = document.createElement('p');
+    p.textContent = a.status === 'online' ? 'no open orders' : 'offline';
+    wrap.appendChild(p);
+    return wrap;
+  }
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const hr = document.createElement('tr');
+  ORDER_COLS.forEach(c => { const th = document.createElement('th'); th.textContent = c; hr.appendChild(th); });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+  const tb = document.createElement('tbody');
+  for (const o of positions) {
+    const tr = document.createElement('tr');
+    if (flashOrders.has(accKey + ':' + o.ticket)) tr.classList.add('flash');
+    [o.ticket, o.symbol, 'market', o.side, px(o.volume), px(o.open_price), px(o.sl), px(o.tp),
+     fmt(o.profit + (o.swap || 0) + (o.commission || 0)), o.magic || ''].forEach((v, i) => cell(tr, v, ORDER_COLS[i]));
+    tb.appendChild(tr);
+  }
+  for (const o of pendings) {
+    const tr = document.createElement('tr');
+    if (flashOrders.has(accKey + ':' + o.ticket)) tr.classList.add('flash');
+    [o.ticket, o.symbol, o.type, o.side, px(o.volume), px(o.price), px(o.sl), px(o.tp), '', o.magic || ''].forEach((v, i) => cell(tr, v, ORDER_COLS[i]));
+    tb.appendChild(tr);
+  }
+  table.appendChild(tb);
+  wrap.appendChild(table);
+  return wrap;
+}
+
+function byAccountId(x, y) {
+  const nx = Number(x.account_id), ny = Number(y.account_id);
+  if (Number.isFinite(nx) && Number.isFinite(ny)) return nx - ny;
+  return String(x.account_id).localeCompare(String(y.account_id));
+}
+
+// Connected master+slave groups first (master row, slaves below), then disconnected
+// master+slave groups, then pending accounts always last, each tier by account id.
+function sortAccountsForDisplay(list) {
+  const pending = [];
+  const masters = [];
+  const slavesByMasterKey = new Map();
+  const orphans = [];
+  for (const a of list) {
+    if (a.role === 'pending') { pending.push(a); continue; }
+    if (a.role === 'master') { masters.push(a); continue; }
+    if (a.role === 'slave') {
+      const master = findMaster((a.copyTradingConfig || {}).masterTcpUrl);
+      if (!master) { orphans.push(a); continue; }
+      const mk = accountKey(master);
+      if (!slavesByMasterKey.has(mk)) slavesByMasterKey.set(mk, []);
+      slavesByMasterKey.get(mk).push(a);
+      continue;
+    }
+    orphans.push(a);
+  }
+  const groups = masters.map(m => ({
+    connected: m.status === 'online',
+    id: m,
+    rows: [m, ...(slavesByMasterKey.get(accountKey(m)) || []).sort(byAccountId)],
+  }));
+  for (const o of orphans) groups.push({ connected: o.status === 'online', id: o, rows: [o] });
+  groups.sort((g1, g2) => (g1.connected !== g2.connected) ? (g1.connected ? -1 : 1) : byAccountId(g1.id, g2.id));
+  pending.sort(byAccountId);
+  return groups.flatMap(g => g.rows).concat(pending);
+}
+
+function render() {
+  const tb = $('accounts').querySelector('tbody');
+  tb.innerHTML = '';
+  $('accounts').tHead.hidden = !accounts.length;
+  for (const a of sortAccountsForDisplay(accounts)) {
+    const key = accountKey(a);
+    const tr = document.createElement('tr');
+    if (flashAccounts.has(key)) tr.classList.add('flash');
+    const cfg = a.copyTradingConfig || {};
+    const cells = [
+      a.account_id, a.server_name || a.server,
+      a.status + (a.reconnect_type && a.status !== 'online' ? ' (' + a.reconnect_type + ')' : ''),
+      a.role, a.role === 'slave' ? masterLabel(cfg.masterTcpUrl) : '',
+      fmt(a.balance), fmt(a.equity), fmt(a.pnl),
+      a.open_orders + '/' + a.pending_orders,
+    ];
+    cells.forEach((c, i) => cell(tr, c, COLS[i]));
+    const td = document.createElement('td');
+    td.className = 'rowActions';
+    const orders = document.createElement('button');
+    orders.textContent = expanded.has(key) ? 'Hide orders' : 'Orders';
+    orders.onclick = () => { expanded.has(key) ? expanded.delete(key) : expanded.add(key); render(); };
+    const edit = document.createElement('button'); edit.textContent = 'Edit'; edit.onclick = () => openEdit(a);
+    const del = document.createElement('button'); del.textContent = 'Delete'; del.onclick = () => removeAccount(a);
+    td.appendChild(orders); td.appendChild(document.createTextNode(' '));
+    td.appendChild(edit); td.appendChild(document.createTextNode(' ')); td.appendChild(del);
+    tr.appendChild(td);
+    tb.appendChild(tr);
+    if (expanded.has(key)) {
+      const otr = document.createElement('tr');
+      otr.className = 'orders';
+      otr.appendChild(renderOrders(a, key));
+      tb.appendChild(otr);
+    }
+  }
+  flashAccounts.clear();
+  flashOrders.clear();
+  if (editing) {
+    const cur = accounts.find(x => accountKey(x) === accountKey(editing));
+    if (cur) editing = cur;
+  }
+}
+
+// short is what narrow screens show; it defaults to the full text.
+function setLive(on, text, short) {
+  const el = $('live');
+  el.className = on ? 'on' : 'off';
+  el.innerHTML = '';
+  for (const [cls, t] of [['full', text], ['short', short ?? text]]) {
+    const span = document.createElement('span');
+    span.className = cls;
+    span.textContent = t;
+    el.appendChild(span);
+  }
+}
+
+function mb(bytes) {
+  return bytes >= 1024 ** 3 ? (bytes / 1024 ** 3).toFixed(1) + ' GB' : Math.round(bytes / 1024 ** 2) + ' MB';
+}
+
+function setStats(s) {
+  const el = $('stats');
+  if (!s) { el.textContent = ''; el.title = ''; return; }
+  el.textContent = 'CPU ' + s.cpuPercent.toFixed(1) + '% RAM ' + s.ramPercent.toFixed(1) + '%';
+  el.title = 'RAM ' + mb(s.ramUsedBytes) + ' / ' + mb(s.ramTotalBytes);
+}
+
+function applyAccounts(list) {
+  computeFlashes(list);
+  accounts = list;
+  lastUpdate = new Date();
+  render();
+}
+
+async function loadAccounts() {
+  try {
+    applyAccounts(await api('GET', '/api/accounts'));
+  } catch (e) {
+    msg('cannot load accounts: ' + e.message, false);
+  }
+}
+
+// Live updates: the server pushes the whole account list whenever it changes.
+// Falls back to polling when EventSource is missing or the stream keeps failing.
+let stream = null;
+let pollTimer = null;
+
+function startPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(loadAccounts, 5000);
+  setLive(false, 'polling');
+}
+
+function stopPolling() {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+function connectLive() {
+  if (!('EventSource' in window)) { startPolling(); return; }
+  stream = new EventSource('/api/events');
+  stream.addEventListener('accounts', ev => {
+    stopPolling();
+    try { applyAccounts(JSON.parse(ev.data)); } catch (e) { msg('bad live update: ' + e.message, false); return; }
+    const utc = lastUpdate.toISOString();
+    setLive(true, 'live ' + utc.slice(11, 19) + ' UTC', utc.slice(11, 16));
+  });
+  stream.addEventListener('stats', ev => {
+    try { setStats(JSON.parse(ev.data)); } catch (e) { setStats(null); }
+  });
+  stream.onopen = () => setLive(true, 'live');
+  stream.onerror = () => {
+    // The browser retries on its own; a dead session must send us to the login page.
+    setLive(false, 'reconnecting');
+    setStats(null);
+    checkSession();
+    startPolling();
+  };
+}
+
+async function searchBrokers() {
+  const q = $('brokerQuery').value.trim();
+  if (!q) return;
+  const sel = $('serverSelect');
+  sel.innerHTML = '<option>searching...</option>';
+  try {
+    const companies = await api('GET', '/api/servers/' + encodeURIComponent(q));
+    sel.innerHTML = '<option value="">-- pick a server --</option>';
+    for (const c of companies) {
+      for (const r of c.results || []) {
+        const o = document.createElement('option');
+        o.value = r.name || '';
+        o.textContent = (r.name || '') + (c.company_label ? '  (' + c.company_label + ')' : '');
+        sel.appendChild(o);
+      }
+    }
+    if (sel.options.length === 1) sel.innerHTML = '<option value="">no results</option>';
+  } catch (e) {
+    sel.innerHTML = '<option value="">error</option>';
+    msg('Search failed: ' + e.message, false);
+  }
+}
+
+async function addAccount() {
+  const server = $('serverSelect').value.trim();
+  const accountId = $('accountId').value.trim();
+  const password = $('password').value;
+  const role = $('newRole').value;
+  if (!server || !accountId || !password) { msg('server, account id and password are required', false); return; }
+  $('connectBtn').disabled = true;
+  msg('connecting ' + accountId + ' @ ' + server + ' ...', true);
+  try {
+    await api('PUT', accountPath(server, accountId), {
+      mt5: { server, password },
+      copyTradingConfig: { role, copyEnabled: true },
+    });
+    msg('connected ' + accountId, true);
+    resetAdd();
+    closeAdd();
+    await loadAccounts();
+  } catch (e) {
+    msg('connect failed: ' + e.message, false);
+  } finally {
+    $('connectBtn').disabled = false;
+  }
+}
+
+function accountPath(server, accountId) {
+  return '/api/accounts/' + encodeURIComponent(server) + '/' + encodeURIComponent(accountId);
+}
+
+async function removeAccount(a) {
+  if (!confirm('Delete ' + a.account_id + ' @ ' + a.server + '?')) return;
+  try {
+    await api('DELETE', accountPath(a.server, a.account_id));
+    msg('deleted ' + a.account_id, true);
+    if (editing && editing.account_id === a.account_id && editing.server === a.server) closeEdit();
+    await loadAccounts();
+  } catch (e) {
+    msg('delete failed: ' + e.message, false);
+  }
+}
+
+function openAdd() {
+  $('addBox').hidden = false;
+  $('addBox').scrollIntoView();
+}
+
+function closeAdd() {
+  $('addBox').hidden = true;
+}
+
+function resetAdd() {
+  $('brokerQuery').value = '';
+  $('serverSelect').innerHTML = '';
+  $('accountId').value = '';
+  $('password').value = '';
+  $('newRole').value = 'pending';
+}
+
+function toggleSlaveFields() {
+  $('slaveFields').hidden = $('e_role').value !== 'slave';
+}
+
+function openEdit(a) {
+  editing = a;
+  const c = a.copyTradingConfig || {};
+  $('editTitle').textContent = a.account_id + ' @ ' + a.server;
+  $('e_role').value = a.role || 'pending';
+  $('e_copyEnabled').checked = c.copyEnabled !== false;
+  $('e_password').value = '';
+  const ms = $('e_masterSelect');
+  ms.innerHTML = '<option value="">-- no master yet --</option>';
+  for (const m of accounts) {
+    if (m.role !== 'master' || (m.account_id === a.account_id && m.server === a.server)) continue;
+    const o = document.createElement('option');
+    o.value = m.tcp_path ? location.hostname + m.tcp_path : '';
+    o.disabled = !m.tcp_path;
+    o.textContent = m.account_id + ' @ ' + m.server + (m.tcp_path ? '' : ' (offline)');
+    ms.appendChild(o);
+  }
+  $('e_masterTcpUrl').value = c.masterTcpUrl || '';
+  const cur = findMaster(c.masterTcpUrl);
+  ms.value = cur ? location.hostname + cur.tcp_path : '';
+  $('e_lotType').value = c.lotType === 'fixed' ? 'fixed' : 'multiplier';
+  $('e_lotMultiplier').value = c.lotMultiplier ?? 1;
+  $('e_fixedLot').value = c.fixedLot ?? 0.01;
+  $('e_reverseTrading').checked = !!c.reverseTrading;
+  $('e_copyPendingOrders').checked = c.copyPendingOrders !== false;
+  $('e_copySlTp').checked = c.copySlTp !== false;
+  $('e_exactMatch').checked = !!c.exactMatch;
+  $('e_noTradeTag').checked = !!c.noTradeTag;
+  $('e_prefixEnabled').checked = !!(c.prefix && c.prefix.enabled);
+  $('e_prefixValue').value = (c.prefix && c.prefix.value) || '';
+  $('e_prefixAction').value = (c.prefix && c.prefix.action) || 'add';
+  $('e_suffixEnabled').checked = !!(c.suffix && c.suffix.enabled);
+  $('e_suffixValue').value = (c.suffix && c.suffix.value) || '';
+  $('e_suffixAction').value = (c.suffix && c.suffix.action) || 'add';
+  $('e_symbolTranslations').value = (c.symbolTranslations || []).join('\n');
+  $('e_symbolFilterMode').value = c.symbolFilterMode || 'off';
+  $('e_symbolFilterList').value = (c.symbolFilterList || []).join(',');
+  toggleSlaveFields();
+  $('editBox').hidden = false;
+  $('editBox').scrollIntoView();
+}
+
+function closeEdit() {
+  editing = null;
+  $('editBox').hidden = true;
+}
+
+async function saveEdit() {
+  if (!editing) return;
+  const role = $('e_role').value;
+  const cfg = { role, copyEnabled: $('e_copyEnabled').checked };
+  if (role === 'slave') {
+    cfg.masterTcpUrl = $('e_masterTcpUrl').value.trim() || null;
+    cfg.lotType = $('e_lotType').value;
+    cfg.lotMultiplier = Number($('e_lotMultiplier').value) || 1;
+    cfg.fixedLot = Number($('e_fixedLot').value) || 0.01;
+    cfg.reverseTrading = $('e_reverseTrading').checked;
+    cfg.copyPendingOrders = $('e_copyPendingOrders').checked;
+    cfg.copySlTp = $('e_copySlTp').checked;
+    cfg.exactMatch = $('e_exactMatch').checked;
+    cfg.noTradeTag = $('e_noTradeTag').checked;
+    cfg.prefix = { enabled: $('e_prefixEnabled').checked, value: $('e_prefixValue').value.trim(), action: $('e_prefixAction').value };
+    cfg.suffix = { enabled: $('e_suffixEnabled').checked, value: $('e_suffixValue').value.trim(), action: $('e_suffixAction').value };
+    cfg.symbolTranslations = $('e_symbolTranslations').value.split('\n').map(s => s.trim()).filter(Boolean);
+    cfg.symbolFilterMode = $('e_symbolFilterMode').value;
+    cfg.symbolFilterList = $('e_symbolFilterList').value.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  const body = { copyTradingConfig: cfg };
+  const pw = $('e_password').value;
+  if (pw) body.mt5 = { server: editing.server, password: pw };
+  try {
+    await api('PUT', accountPath(editing.server, editing.account_id), body);
+    msg('saved ' + editing.account_id, true);
+    closeEdit();
+    await loadAccounts();
+  } catch (e) {
+    msg('save failed: ' + e.message, false);
+  }
+}
+
+loadAccounts();
+connectLive();
+</script>
+</body>
+</html>
