@@ -99,7 +99,7 @@ export default function Home() {
       </fieldset>
 
       <footer>
-        by <a href="https://github.com/jometa9" target="_blank" rel="noopener">https://github.com/jometa9</a>
+        by <a href="https://github.com/jometa9" target="_blank" rel="noopener">github.com/jometa9</a>
       </footer>
     </main>
   );
