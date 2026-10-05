@@ -1,6 +1,6 @@
-// Mock backend for the landing page demo. The panel in this folder is an unmodified copy of
-// 5MTrader-MT5-API/wwwroot/index.html; this script replaces fetch and EventSource so it runs
-// on simulated accounts: a master trades on its own and the slaves copy it about 1s later.
+// Mock backend for the landing page demo. The pages in this folder are unmodified copies of
+// 5MTrader-MT5-API/wwwroot/index.html and history.html; this script replaces fetch and EventSource
+// so they run on simulated accounts: a master trades on its own and the slaves copy it about 1s later.
 (() => {
   const MASTER_PATH = '/mt5/FTMO-Demo/1514761741';
   const r2 = (n) => Math.round(n * 100) / 100;
@@ -30,7 +30,16 @@
   }
 
   function account(id, server, role, lotMultiplier, balance, nextTicket) {
-    return { id, server, balance, nextTicket, orders: [], config: config(role, lotMultiplier) };
+    return { id, server, balance, nextTicket, orders: [], history: [], config: config(role, lotMultiplier) };
+  }
+
+  // Same shape as HistoryOrderDto.
+  function closedOrder(a, ticket, mt, symbol, side, volume, openPrice, closePrice, openTime, closeTime, gross, swap) {
+    return {
+      ticket, symbol, type: 'market', side, volume, open_price: openPrice, close_price: closePrice,
+      open_time: openTime, close_time: closeTime, profit: gross, swap, commission: -r2(volume * 7), magic: 0,
+      copy_tag_master_ticket: a === master ? null : mt,
+    };
   }
 
   const accounts = [
@@ -40,6 +49,47 @@
     account('52201937', 'ICMarketsSC-Demo02', 'slave', 2, 25310.42, 1893310527),
   ];
   const master = accounts[0];
+
+  // ---- past trades for the history page, the same on every load (seeded random) ----
+
+  let seed = 5;
+  const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+
+  (function seedHistory() {
+    const now = Math.floor(Date.now() / 1000);
+    const start = now - 420 * 86400;
+    // Dense over the last two days so "Today" is never empty, about one trade a day before that.
+    const past = [];
+    for (let t = now - 600; t > start; t -= t > now - 2 * 86400 ? 1200 + rand() * 2400 : 43200 + rand() * 129600) {
+      const symbol = SYMBOLS[Math.floor(rand() * SYMBOLS.length)];
+      const side = rand() < 0.5 ? 'buy' : 'sell';
+      const volume = r2(0.05 + Math.floor(rand() * 4) * 0.05);
+      const hold = 300 + Math.floor(rand() * 14400);
+      const openPrice = rr(ANCHOR[symbol] * (1 + (rand() - 0.5) * 0.08), symbol);
+      // Roughly 60% winners, losers a bit smaller: a believable, positive account.
+      const win = rand() < 0.6;
+      const move = (win ? 1 : -0.8) * (0.2 + rand()) * VOL[symbol] * 25;
+      const closePrice = rr(openPrice + (side === 'buy' ? move : -move), symbol);
+      past.push({ mt: 0, symbol, side, volume, openPrice, closePrice, openTime: t - hold, closeTime: t, swap: hold > 7200 ? -r2(rand() * 3) : 0 });
+    }
+    past.reverse();
+    for (const a of accounts) {
+      const deposit = r2(a.balance * 0.9);
+      a.history.push({
+        ticket: a.nextTicket - 100000, symbol: '', type: 'deposit', side: '', volume: 0, open_price: 0, close_price: 0,
+        open_time: start - 86400, close_time: start - 86400, profit: deposit, swap: 0, commission: 0, magic: 0, copy_tag_master_ticket: null,
+      });
+      let ticket = a.nextTicket - 90000;
+      for (const p of past) {
+        if (a === master) p.mt = ticket;
+        const volume = lots(a, p.volume);
+        const diff = p.side === 'buy' ? p.closePrice - p.openPrice : p.openPrice - p.closePrice;
+        const delay = a === master ? 0 : 1;
+        a.history.push(closedOrder(a, ticket++, p.mt, p.symbol, p.side, volume, p.openPrice, p.closePrice,
+          p.openTime + delay, p.closeTime + delay, r2(diff * volume * CONTRACT[p.symbol]), r2(p.swap * volume / p.volume)));
+      }
+    }
+  })();
 
   function isCopying(a) {
     const c = a.config;
@@ -87,9 +137,23 @@
         o.volume = volume;
       }
     } else if (op.k === 'close') {
-      for (const o of a.orders) if (mine(o)) a.balance += profit(o);
-      a.orders = a.orders.filter((o) => !mine(o));
+      closeOrders(a, mine);
     }
+  }
+
+  // Closed positions go to the account history (pending orders are just cancelled).
+  function closeOrders(a, pick) {
+    const closedAt = Math.floor(Date.now() / 1000);
+    for (const o of a.orders) {
+      if (!pick(o)) continue;
+      if (o.type === 'market') {
+        const p = r2(profit(o));
+        a.balance += p;
+        a.history.push(closedOrder(a, o.ticket, o.mt, o.symbol, o.side, o.volume, o.price, prices[o.symbol],
+          Math.floor(o.openedAt / 1000), closedAt, p, 0));
+      }
+    }
+    a.orders = a.orders.filter((o) => !pick(o));
   }
 
   // One round of master activity on a single symbol; at most 4 orders are open at once
@@ -193,7 +257,7 @@
   // The panel starts with every account collapsed; open them all once, like a user would.
   function expandAll() {
     for (let i = 0; i < accounts.length; i++) {
-      const btn = [...document.querySelectorAll('#accounts td.rowActions button')].find((b) => b.textContent === 'Orders');
+      const btn = [...document.querySelectorAll('#accounts td.rowActions button')].find((b) => b.title === 'Orders');
       if (!btn) break;
       btn.click();
     }
@@ -211,7 +275,9 @@
   window.fetch = async (path, opts = {}) => {
     const method = (opts.method || 'GET').toUpperCase();
     const body = opts.body ? JSON.parse(opts.body) : null;
-    const parts = String(path).split('?')[0].split('/').filter(Boolean).map(decodeURIComponent);
+    const [route, query] = String(path).split('?');
+    const parts = route.split('/').filter(Boolean).map(decodeURIComponent);
+    const filter = new URLSearchParams(query).get('filter');
 
     if (parts[1] === 'session') return reply({ authRequired: false });
     if (parts[1] === 'logout') return reply(null);
@@ -220,11 +286,18 @@
       const name = q.charAt(0).toUpperCase() + q.slice(1);
       return reply([{ company_label: name, results: [{ name: name + '-Demo' }, { name: name + '-Server' }] }]);
     }
+    if (parts[1] === 'history') {
+      return reply(accounts.map((a) => ({
+        account_id: a.id, server: a.server, role: a.config.role, status: 'online', orders: historyOf(a, filter), error: null,
+      })).sort((x, y) => x.account_id.localeCompare(y.account_id)));
+    }
     if (parts[1] !== 'accounts') return reply('not found', 404);
     if (parts.length === 2) return reply(list());
+    if (parts[2] === 'close-all' && method === 'POST') return reply(closeAll());
 
     const [server, id] = [parts[2], parts[3]];
     let a = accounts.find((x) => x.server === server && x.id === id);
+    if (parts[4] === 'history') return a ? reply(historyOf(a, filter)) : reply('Unknown account', 404);
     if (method === 'DELETE') {
       if (!a) return reply('account not found', 404);
       accounts.splice(accounts.indexOf(a), 1);
@@ -239,6 +312,28 @@
     setTimeout(pushAccounts, 0);
     return reply(a ? snapshot(a) : null);
   };
+
+  // Same ranges as HistoryRangeUtil: today / month / year in UTC, or lifetime. Newest first, like MT5.
+  function historyOf(a, filter) {
+    const d = new Date();
+    const from = filter === 'lifetime' ? 0
+      : filter === 'year' ? Date.UTC(d.getUTCFullYear(), 0, 1)
+      : filter === 'month' ? Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)
+      : Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    return a.history.filter((o) => o.close_time * 1000 >= from).sort((x, y) => y.close_time - x.close_time);
+  }
+
+  // Same order as the real endpoint: masters, then slaves, then pending accounts.
+  function closeAll() {
+    const rank = { master: 0, slave: 1 };
+    const result = { accounts: [] };
+    for (const a of [...accounts].sort((x, y) => (rank[x.config.role] ?? 2) - (rank[y.config.role] ?? 2))) {
+      result.accounts.push({ account_id: a.id, server: a.server, role: a.config.role, results: a.orders.map((o) => ({ ticket: o.ticket, ok: true })) });
+      closeOrders(a, () => true);
+    }
+    setTimeout(pushAccounts, 0);
+    return result;
+  }
 
   // ---- market ticks and server stats ----
 

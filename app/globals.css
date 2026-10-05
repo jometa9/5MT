@@ -82,3 +82,10 @@ footer { color: #666; }
   .form > span:nth-child(odd) { margin-top: 8px; }
   button, .btn { padding: 8px 10px; }
 }
+section { display: flex; flex-direction: column; gap: 24px; scroll-margin-top: 24px; }
+.sectionTitle { font-size: 18px; }
+nav.actions { margin-top: 0; }
+.btn.sw { background: #3f8f1f; border-color: #3f8f1f; color: #fff; }
+.btn.sw:hover { background: #2f6f15; border-color: #2f6f15; }
+.btn.ff { background: #36558b; border-color: #36558b; color: #fff; }
+.btn.ff:hover { background: #2a4370; border-color: #2a4370; }

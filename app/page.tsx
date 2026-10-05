@@ -1,5 +1,11 @@
 import PanelDemo from "./PanelDemo";
 
+// Both demos show the same tabs (panel and Swagger), each with its own one active.
+const demoTabs = [
+  { title: "5MT", icon: process.env.BASE_PATH + "/cube.svg" },
+  { title: "5MTrader MT5 API", icon: process.env.BASE_PATH + "/swagger/favicon-32x32.png" },
+];
+
 const jsonLd = {
   "@context": "https://schema.org",
   "@graph": [
@@ -39,38 +45,95 @@ export default function Home() {
         <p className="subtitle">速度に取り憑かれている。</p>
       </header>
 
-      <PanelDemo />
+      <nav className="actions" aria-label="Sections">
+        <a className="btn ff" href="#copy-trading-server">copy trading server</a>
+        <a className="btn sw" href="#api-server">api server</a>
+      </nav>
 
-      <fieldset>
-        <legend><h2>what</h2></legend>
-        <p><b>Self-hosted copy trading server for MT5.</b></p>
-        <p>How it works:</p>
-        <ol>
-          <li>Connect your MT5 accounts.</li>
-          <li>Mark one as <b>master</b> and the rest as <b>slaves</b>.</li>
-          <li>Every trade the master opens, modifies or closes is repeated on the slaves,
-          about one second behind the broker.</li>
-        </ol>
-        <p>What you need:</p>
-        <ul>
-          <li>Any broker, demo or live.</li>
-          <li>No MT5 terminal, no EA, no Windows VPS.</li>
-          <li>Everything runs on your own server and is managed from a web page.</li>
-        </ul>
-      </fieldset>
+      <section id="copy-trading-server">
+        <h2 className="sectionTitle">copy trading server</h2>
 
-      <fieldset>
-        <legend><h2>features</h2></legend>
-        <ul>
-          <li>Market and pending orders, SL/TP, partial closes, modifications.</li>
-          <li>Lot multiplier or fixed lot, clamped to broker limits.</li>
-          <li>Reverse trading, symbol prefix/suffix, symbol translations, symbol allow/block filters.</li>
-          <li>Exact match mode: the slave mirrors the master and stray orders are closed.</li>
-          <li>Reconciles state after restarts and reconnections.</li>
-          <li>Password-protected web panel, works on mobile.</li>
-          <li>Deploy on Railway in minutes, or with Docker on any server.</li>
-        </ul>
-      </fieldset>
+        <PanelDemo
+          src="/panel/index.html"
+          url="5mt-copy-server.up.railway.app"
+          tabs={demoTabs}
+          active={0}
+          title="5MT Copy Server web panel, live demo with simulated accounts"
+        />
+
+        <fieldset>
+          <legend><h2>what</h2></legend>
+          <p><b>Self-hosted copy trading server for MT5.</b></p>
+          <p>How it works:</p>
+          <ol>
+            <li>Connect your MT5 accounts.</li>
+            <li>Mark one as <b>master</b> and the rest as <b>slaves</b>.</li>
+            <li>Every trade the master opens, modifies or closes is repeated on the slaves,
+            about one second behind the broker.</li>
+          </ol>
+          <p>What you need:</p>
+          <ul>
+            <li>Any broker, demo or live.</li>
+            <li>No MT5 terminal, no EA, no Windows VPS.</li>
+            <li>Everything runs on your own server and is managed from a web page.</li>
+          </ul>
+        </fieldset>
+
+        <fieldset>
+          <legend><h2>features</h2></legend>
+          <ul>
+            <li>Market and pending orders, SL/TP, partial closes, modifications.</li>
+            <li>Lot multiplier or fixed lot, clamped to broker limits.</li>
+            <li>Reverse trading, symbol prefix/suffix, symbol translations, symbol allow/block filters.</li>
+            <li>Exact match mode: the slave mirrors the master and stray orders are closed.</li>
+            <li>Reconciles state after restarts and reconnections.</li>
+            <li>Live balance, equity, PnL and open orders of every account, plus server CPU and RAM.</li>
+            <li>Close all: closes every position and pending order on every account in one click, masters first.</li>
+            <li>History of closed orders, per account or all accounts together: today, current month, current year or lifetime (UTC).</li>
+            <li>Stats: total PnL, winrate, max win, max loss, average win, average loss, R and trade count. Deposits, withdrawals and credits are left out.</li>
+            <li>Password-protected web panel, works on mobile.</li>
+            <li>Deploy on Railway in minutes, or with Docker on any server.</li>
+          </ul>
+        </fieldset>
+      </section>
+
+      <section id="api-server">
+        <h2 className="sectionTitle">api server</h2>
+
+        <PanelDemo
+          src="/swagger/index.html"
+          url="5mt-copy-server.up.railway.app/swagger/index.html"
+          tabs={demoTabs}
+          active={1}
+          title="5MTrader MT5 API Swagger page"
+          height={800}
+        />
+
+        <fieldset>
+          <legend><h2>what</h2></legend>
+          <p><b>HTTP API for MT5, on the same server.</b></p>
+          <p>Trade, read accounts and get prices on any MT5 broker from your own code, with plain JSON
+          requests. No MT5 terminal, no EA. Accounts added through the API show up in the web panel and
+          vice versa.</p>
+          <div className="actions">
+            <a className="btn sw" href={process.env.BASE_PATH + "/swagger/index.html"} target="_blank" rel="noopener">Open the Swagger page</a>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend><h2>features</h2></legend>
+          <ul>
+            <li>Accounts: add, list, remove, balance and equity, copy trading config.</li>
+            <li>Orders: open market and pending orders, modify SL/TP or pending price, close, close by, close all.</li>
+            <li>Open positions, pending orders and closed order history.</li>
+            <li>Market data: current price, 1-minute bars, trading hours of a symbol.</li>
+            <li>Broker server search and demo account creation.</li>
+            <li>Raw TCP feed with the trades of every master account.</li>
+            <li>Same JSON envelope on every response and clear status codes for broker errors.</li>
+            <li>Swagger page with every endpoint documented, served by the server itself.</li>
+          </ul>
+        </fieldset>
+      </section>
 
       <fieldset>
         <legend><h2>get it</h2></legend>

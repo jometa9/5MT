@@ -14,14 +14,16 @@
     font: 13px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   }
   main { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
-  h1 { margin: 0; font-size: 24px; font-weight: normal; display: flex; gap: 12px; align-items: center; }
-  h1 img { display: block; }
+  h1 { margin: 0; font-size: 24px; font-weight: normal; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  h1 img { display: block; flex-shrink: 0; }
   h1 button { font-size: 13px; }
-  h1 #addAccountBtn { margin-left: auto; }
+  #logout { padding: 4px; }
+  .headerActions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
   h2 { margin: 0; font-size: 13px; font-weight: normal; }
   #msg { margin: 0; min-height: 1.5em; }
   #msg.err::before { content: "! "; }
   #msg.idle { color: #666; }
+  .empty { margin: 0; color: #666; }
 
   fieldset { border: 1px solid #000; padding: 14px 18px 18px; margin: 0; min-inline-size: 0; min-width: 0; }
   legend { padding: 0 8px; display: flex; gap: 10px; align-items: center; }
@@ -39,6 +41,7 @@
   #accounts tr.orders table tbody > tr.flash > td { animation: flashRow 1.2s ease-out; }
   #accounts { width: 100%; }
   #accounts tr.orders > td { padding: 0 0 0 24px; border-bottom: 1px solid #000; }
+  #accounts tr.slaveRow > td:first-child { padding-left: 24px; }
   #accounts tr.orders table { width: 100%; table-layout: auto; }
   #accounts tr.orders table th, #accounts tr.orders table td { padding: 2px 8px; border-bottom: 1px dotted #000; }
   #accounts tr.orders table tr:last-child td { border-bottom: 0; }
@@ -60,6 +63,9 @@
   .checks { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 24px; padding: 6px 0; }
   .checks label { display: flex; gap: 8px; align-items: center; }
   .actions { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 6px; }
+  #closeAllResult:not(:empty) { margin-top: 10px; }
+  #closeAllResult table { margin-top: 6px; }
+  #closeAllResult td.fail { color: #a00; }
 
   input, select, textarea, button {
     font: inherit; color: inherit; background: #fff; border: 1px solid #000; border-radius: 0;
@@ -70,10 +76,12 @@
   input[type=checkbox] { width: 14px; height: 14px; margin: 0; accent-color: #000; }
   textarea { width: 100%; resize: vertical; }
   input:focus, select:focus, textarea:focus { outline: 1px solid #000; outline-offset: -2px; }
-  button { cursor: pointer; }
+  button { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
   button:hover { background: #000; color: #fff; }
   button:disabled { opacity: .4; cursor: default; }
+  button svg { width: 14px; height: 14px; flex-shrink: 0; }
   td button { padding: 1px 8px; }
+  td.rowActions button { padding: 4px; }
   legend button { padding: 0 8px; }
   [hidden] { display: none !important; }
   hr { border: 0; border-top: 1px solid #000; grid-column: 1 / -1; margin: 4px 0; }
@@ -117,8 +125,10 @@
     main { gap: 16px; }
     .form > *, .form label > * { min-width: 0; max-width: 100%; }
     .form .row > * { min-width: 0; }
-    h1 { font-size: 20px; gap: 10px; flex-wrap: wrap; }
+    h1 { font-size: 20px; gap: 10px; }
     h1 img { width: 28px; height: 28px; }
+    .headerActions { margin-left: 0; flex-basis: 100%; }
+    .headerActions button { flex: 1 1 auto; }
     fieldset { padding: 10px 12px 14px; }
     legend { flex-wrap: wrap; row-gap: 6px; }
     #accountsTitle, #live .full { display: none; }
@@ -130,7 +140,7 @@
     .checks { grid-template-columns: 1fr; padding: 10px 0 4px; }
     .actions { margin-top: 12px; flex-wrap: wrap; }
     .actions button { flex: 1 1 auto; }
-    input, select, textarea, button { font-size: 16px; padding: 6px 10px; }
+    input, select, textarea, button { padding: 6px 10px; }
     input[type=text], select, textarea { min-width: 0; width: 100%; }
     input[type=number] { min-width: 0; width: 110px; }
     input[type=checkbox] { width: 18px; height: 18px; }
@@ -143,7 +153,15 @@
 <body>
 <main>
 
-<h1><img src="../cube.svg" alt="" width="36" height="36">5MT<button id="addAccountBtn" onclick="openAdd()">Add account</button> <button id="logout" onclick="logout()" hidden>logout</button></h1>
+<h1><img src="../cube.svg" alt="" width="36" height="36"><span class="title">5MT</span>
+  <div class="headerActions">
+    <button id="historyBtn" onclick="location.href='history.html'" title="History" aria-label="History"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg></button>
+    <button id="closeAllBtn" onclick="openCloseAll()" title="Close all" aria-label="Close all"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg></button>
+    <button id="addAccountBtn" onclick="openAdd()" title="Add account" aria-label="Add account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+    <button id="apiBtn" onclick="location.href='../swagger/index.html'" title="API" aria-label="API">API</button>
+    <button id="logout" onclick="logout()" title="Logout" aria-label="Logout" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+  </div>
+</h1>
 
 <p id="msg" class="idle">All systems running normally.</p>
 
@@ -249,6 +267,26 @@
   </div>
 </fieldset>
 
+<fieldset id="closeAllBox" hidden>
+  <legend>Close all</legend>
+  <p>This closes <strong>every open position and pending order</strong> on <strong>every connected account</strong>. This cannot be undone.</p>
+  <p>Order: master accounts first, then slave accounts, then accounts with no role assigned.</p>
+  <div class="actions">
+    <button id="closeAllConfirmBtn" onclick="confirmCloseAll()">Yes, close everything</button>
+    <button onclick="closeCloseAll()">Cancel</button>
+  </div>
+  <div id="closeAllResult"></div>
+</fieldset>
+
+<fieldset id="confirmBox" hidden>
+  <legend id="confirmTitle">Confirm</legend>
+  <p id="confirmMessage"></p>
+  <div class="actions">
+    <button id="confirmYesBtn" onclick="runConfirm()">Yes</button>
+    <button onclick="closeConfirm()">Cancel</button>
+  </div>
+</fieldset>
+
 <fieldset>
   <legend><span id="accountsTitle">Accounts</span> <span id="live" class="off">connecting</span> <span id="stats"></span></legend>
   <div class="tableWrap">
@@ -262,6 +300,7 @@
     <tbody></tbody>
   </table>
   </div>
+  <p id="noAccounts" class="empty" hidden>No accounts yet. Use + (Add account) to connect one.</p>
 </fieldset>
 
 </main>
@@ -324,7 +363,7 @@ function findMaster(url) {
 function masterLabel(url) {
   if (!url) return '';
   const m = findMaster(url);
-  if (m) return m.account_id + ' @ ' + m.server;
+  if (m) return m.account_id + ' ' + m.server;
   const parts = url.split('/').filter(Boolean);
   return parts[parts.length - 1] || '';
 }
@@ -447,15 +486,36 @@ function sortAccountsForDisplay(list) {
   return groups.flatMap(g => g.rows).concat(pending);
 }
 
+const ICONS = {
+  chevronDown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+  chevronUp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',
+  history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>',
+};
+
+function actionBtn(icon, title) {
+  const b = document.createElement('button');
+  b.innerHTML = icon;
+  b.title = title;
+  b.setAttribute('aria-label', title);
+  return b;
+}
+
 function render() {
   const tb = $('accounts').querySelector('tbody');
   tb.innerHTML = '';
-  $('accounts').tHead.hidden = !accounts.length;
+  $('accounts').hidden = !accounts.length;
+  $('noAccounts').hidden = !!accounts.length;
+  // History and Close all have nothing to act on without accounts.
+  $('historyBtn').disabled = !accounts.length;
+  $('closeAllBtn').disabled = !accounts.length;
   for (const a of sortAccountsForDisplay(accounts)) {
     const key = accountKey(a);
     const tr = document.createElement('tr');
     if (flashAccounts.has(key)) tr.classList.add('flash');
     const cfg = a.copyTradingConfig || {};
+    if (a.role === 'slave' && findMaster(cfg.masterTcpUrl)) tr.classList.add('slaveRow');
     const cells = [
       a.account_id, a.server_name || a.server,
       a.status + (a.reconnect_type && a.status !== 'online' ? ' (' + a.reconnect_type + ')' : ''),
@@ -466,12 +526,14 @@ function render() {
     cells.forEach((c, i) => cell(tr, c, COLS[i]));
     const td = document.createElement('td');
     td.className = 'rowActions';
-    const orders = document.createElement('button');
-    orders.textContent = expanded.has(key) ? 'Hide orders' : 'Orders';
+    const orders = actionBtn(expanded.has(key) ? ICONS.chevronUp : ICONS.chevronDown, expanded.has(key) ? 'Hide orders' : 'Orders');
     orders.onclick = () => { expanded.has(key) ? expanded.delete(key) : expanded.add(key); render(); };
-    const edit = document.createElement('button'); edit.textContent = 'Edit'; edit.onclick = () => openEdit(a);
-    const del = document.createElement('button'); del.textContent = 'Delete'; del.onclick = () => removeAccount(a);
+    const hist = actionBtn(ICONS.history, 'History');
+    hist.onclick = () => location.href = 'history.html?server=' + encodeURIComponent(a.server) + '&accountId=' + encodeURIComponent(a.account_id);
+    const edit = actionBtn(ICONS.edit, 'Edit'); edit.onclick = () => openEdit(a);
+    const del = actionBtn(ICONS.trash, 'Delete'); del.onclick = () => removeAccount(a);
     td.appendChild(orders); td.appendChild(document.createTextNode(' '));
+    td.appendChild(hist); td.appendChild(document.createTextNode(' '));
     td.appendChild(edit); td.appendChild(document.createTextNode(' ')); td.appendChild(del);
     tr.appendChild(td);
     tb.appendChild(tr);
@@ -533,8 +595,27 @@ async function loadAccounts() {
 // Falls back to polling when EventSource is missing or the stream keeps failing.
 let stream = null;
 let pollTimer = null;
+let clockTimer = null;
+
+function tickClock() {
+  const utc = new Date().toISOString();
+  setLive(true, 'live ' + utc.slice(11, 19) + ' UTC', utc.slice(11, 16));
+}
+
+function startClock() {
+  if (clockTimer) return;
+  tickClock();
+  clockTimer = setInterval(tickClock, 1000);
+}
+
+function stopClock() {
+  if (!clockTimer) return;
+  clearInterval(clockTimer);
+  clockTimer = null;
+}
 
 function startPolling() {
+  stopClock();
   if (pollTimer) return;
   pollTimer = setInterval(loadAccounts, 5000);
   setLive(false, 'polling');
@@ -552,15 +633,14 @@ function connectLive() {
   stream.addEventListener('accounts', ev => {
     stopPolling();
     try { applyAccounts(JSON.parse(ev.data)); } catch (e) { msg('bad live update: ' + e.message, false); return; }
-    const utc = lastUpdate.toISOString();
-    setLive(true, 'live ' + utc.slice(11, 19) + ' UTC', utc.slice(11, 16));
   });
   stream.addEventListener('stats', ev => {
     try { setStats(JSON.parse(ev.data)); } catch (e) { setStats(null); }
   });
-  stream.onopen = () => setLive(true, 'live');
+  stream.onopen = () => startClock();
   stream.onerror = () => {
     // The browser retries on its own; a dead session must send us to the login page.
+    stopClock();
     setLive(false, 'reconnecting');
     setStats(null);
     checkSession();
@@ -598,7 +678,7 @@ async function addAccount() {
   const role = $('newRole').value;
   if (!server || !accountId || !password) { msg('server, account id and password are required', false); return; }
   $('connectBtn').disabled = true;
-  msg('connecting ' + accountId + ' @ ' + server + ' ...', true);
+  msg('connecting ' + accountId + ' ' + server + ' ...', true);
   try {
     await api('PUT', accountPath(server, accountId), {
       mt5: { server, password },
@@ -619,16 +699,38 @@ function accountPath(server, accountId) {
   return '/api/accounts/' + encodeURIComponent(server) + '/' + encodeURIComponent(accountId);
 }
 
-async function removeAccount(a) {
-  if (!confirm('Delete ' + a.account_id + ' @ ' + a.server + '?')) return;
-  try {
-    await api('DELETE', accountPath(a.server, a.account_id));
-    msg('deleted ' + a.account_id, true);
-    if (editing && editing.account_id === a.account_id && editing.server === a.server) closeEdit();
-    await loadAccounts();
-  } catch (e) {
-    msg('delete failed: ' + e.message, false);
-  }
+let confirmAction = null;
+
+function showConfirm(message, onConfirm, yesLabel) {
+  $('confirmMessage').textContent = message;
+  $('confirmYesBtn').textContent = yesLabel || 'Yes';
+  confirmAction = onConfirm;
+  $('confirmBox').hidden = false;
+  $('confirmBox').scrollIntoView();
+}
+
+function closeConfirm() {
+  $('confirmBox').hidden = true;
+  confirmAction = null;
+}
+
+async function runConfirm() {
+  const action = confirmAction;
+  closeConfirm();
+  if (action) await action();
+}
+
+function removeAccount(a) {
+  showConfirm('Delete ' + a.account_id + ' ' + a.server + '?', async () => {
+    try {
+      await api('DELETE', accountPath(a.server, a.account_id));
+      msg('deleted ' + a.account_id, true);
+      if (editing && editing.account_id === a.account_id && editing.server === a.server) closeEdit();
+      await loadAccounts();
+    } catch (e) {
+      msg('delete failed: ' + e.message, false);
+    }
+  }, 'Yes, delete');
 }
 
 function openAdd() {
@@ -655,7 +757,7 @@ function toggleSlaveFields() {
 function openEdit(a) {
   editing = a;
   const c = a.copyTradingConfig || {};
-  $('editTitle').textContent = a.account_id + ' @ ' + a.server;
+  $('editTitle').textContent = a.account_id + ' ' + a.server;
   $('e_role').value = a.role || 'pending';
   $('e_copyEnabled').checked = c.copyEnabled !== false;
   $('e_password').value = '';
@@ -666,7 +768,7 @@ function openEdit(a) {
     const o = document.createElement('option');
     o.value = m.tcp_path ? location.hostname + m.tcp_path : '';
     o.disabled = !m.tcp_path;
-    o.textContent = m.account_id + ' @ ' + m.server + (m.tcp_path ? '' : ' (offline)');
+    o.textContent = m.account_id + ' ' + m.server + (m.tcp_path ? '' : ' (offline)');
     ms.appendChild(o);
   }
   $('e_masterTcpUrl').value = c.masterTcpUrl || '';
@@ -729,6 +831,62 @@ async function saveEdit() {
     await loadAccounts();
   } catch (e) {
     msg('save failed: ' + e.message, false);
+  }
+}
+
+function openCloseAll() {
+  $('closeAllResult').innerHTML = '';
+  $('closeAllBox').hidden = false;
+  $('closeAllBox').scrollIntoView();
+}
+
+function closeCloseAll() {
+  $('closeAllBox').hidden = true;
+}
+
+function renderCloseAllResult(result) {
+  const el = $('closeAllResult');
+  el.innerHTML = '';
+  let closed = 0, failed = 0;
+  const failures = [];
+  for (const acc of result.accounts) {
+    for (const r of acc.results) {
+      if (r.ok) closed++;
+      else { failed++; failures.push(acc.account_id + ' ' + acc.server + ' ticket ' + r.ticket + ': ' + (r.broker_message || r.error_code)); }
+    }
+  }
+  const p = document.createElement('p');
+  p.textContent = closed + ' order(s) closed, ' + failed + ' failed.';
+  el.appendChild(p);
+  if (failures.length) {
+    const table = document.createElement('table');
+    const tb = document.createElement('tbody');
+    for (const f of failures) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.className = 'fail';
+      td.textContent = f;
+      tr.appendChild(td);
+      tb.appendChild(tr);
+    }
+    table.appendChild(tb);
+    el.appendChild(table);
+  }
+}
+
+async function confirmCloseAll() {
+  $('closeAllConfirmBtn').disabled = true;
+  msg('closing all orders (master, then slave, then pending)...', true);
+  try {
+    const result = await api('POST', '/api/accounts/close-all');
+    renderCloseAllResult(result);
+    msg('close all finished', true);
+    await loadAccounts();
+    setTimeout(closeCloseAll, 3000);
+  } catch (e) {
+    msg('close all failed: ' + e.message, false);
+  } finally {
+    $('closeAllConfirmBtn').disabled = false;
   }
 }
 

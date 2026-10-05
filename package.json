@@ -5,7 +5,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "npx serve out",
-    "sync-panel": "node scripts/sync-panel.mjs"
+    "sync-panel": "node scripts/sync-panel.mjs",
+    "sync-swagger": "node scripts/sync-swagger.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.48.0",
@@ -16,6 +17,6 @@
   "devDependencies": {
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
-    "typescript": "^7.0.2"
+    "typescript": "7.0.2"
   }
 }

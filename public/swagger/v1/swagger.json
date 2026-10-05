@@ -1,0 +1,2811 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "5MTrader MT5 API",
+    "description": "Public HTTP API of the 5MTrader MT5 bridge. No API key or login is required for /api/mt5/*.\n\n**Account identity.** Every account is identified by `accountId` (MT5 login, digits only) **plus** `server`\n(broker server name). The same login can exist on several servers, so both are always required: in the JSON body\nfor POST/PUT, in the query string for GET. `server` is case-insensitive and surrounding/double spaces are\nnormalized, so `ICMarketsSC-Demo` and ` icmarketssc-demo ` address the same account.\n\n**Accounts are shared with the back office.** An account added here appears on the web dashboard and vice versa.\nNew accounts start with copy role `pending` (not copying) and can be used for everything in this API right away;\nset the role later here or from the dashboard.\n\n**Response envelope.** Every response is JSON `{ success, data, message, errors }`. On success `data` holds the\npayload (or null for actions); on failure `success` is false and `errors` holds a readable message.\n\n**Status codes.** 400 bad input · 404 unknown account/ticket/symbol · 409 broker rejected the trade (market closed,\nno margin, ...) · 502 broker unreachable · 503 account disconnected · 504 broker did not answer in time.\n\n**Realtime.** There is no WebSocket. Masters stream their trades on a raw TCP feed (see GET /api/mt5/tcp/info);\neverything else is request/response.",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/mt5/accounts": {
+      "get": {
+        "tags": [
+          "MT5 Accounts"
+        ],
+        "summary": "List all accounts",
+        "description": "Every account on this bridge, online or offline, with balance, open positions, pending orders and copy config. Sorted by accountId.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSnapshotDtoListApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "MT5 Accounts"
+        ],
+        "summary": "Add or update an account",
+        "description": "**New account** (server + accountId not on the bridge yet): `password` is required. The bridge connects and waits up to ~28 s;\nif the broker rejects the login nothing is saved and the error is returned. Without `copyTradingConfig` the account starts\nas role `pending`: not copying, but usable for every endpoint in this API.\n\n**Existing account:** send `copyTradingConfig` to replace the config, and/or `password` to reconnect with new credentials.\nFields you omit keep their current value. The account is saved and reconnected automatically after restarts.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mt5AccountUpsertDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mt5AccountUpsertResultDtoApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/accounts/one": {
+      "get": {
+        "tags": [
+          "MT5 Accounts"
+        ],
+        "summary": "Get one account",
+        "description": "Same shape as one item of GET /api/mt5/accounts.",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "query",
+            "description": "Broker server name, case-insensitive. Example: ICMarketsSC-Demo.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "MT5 login number, digits only. Example: 52345678.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountSnapshotDtoApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/accounts/info": {
+      "get": {
+        "tags": [
+          "MT5 Accounts"
+        ],
+        "summary": "Get balance and equity",
+        "description": "Lightweight money summary: balance, equity, floating PnL and order counts. Values refresh about once per second while connected.",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "query",
+            "description": "Broker server name, case-insensitive. Example: ICMarketsSC-Demo.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "MT5 login number, digits only. Example: 52345678.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mt5AccountInfoDtoApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/accounts/config": {
+      "put": {
+        "tags": [
+          "MT5 Accounts"
+        ],
+        "summary": "Replace the copy-trading config",
+        "description": "Replaces the whole config (send every field you want to keep; read the current one from GET /api/mt5/accounts/one). Takes effect immediately and is saved.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mt5AccountConfigDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/accounts/remove": {
+      "post": {
+        "tags": [
+          "MT5 Accounts"
+        ],
+        "summary": "Remove an account",
+        "description": "Disconnects the account and deletes it from the bridge (saved credentials and copy ticket maps included). Open positions at the broker are NOT closed. Removing an unknown account is a no-op that still returns 200.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mt5AccountIdentityDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/quotes": {
+      "get": {
+        "tags": [
+          "MT5 Market Data"
+        ],
+        "summary": "Get the current price",
+        "description": "Latest bid/ask. The first call for a symbol subscribes to it and waits for a tick (up to 20 s); later calls answer instantly. Prices come from the broker of the given account, so symbol names follow that broker.",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "query",
+            "description": "Broker server name, case-insensitive. Example: ICMarketsSC-Demo.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "MT5 login number, digits only. Example: 52345678.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "description": "Symbol exactly as the broker names it, suffix included. Example: EURUSD.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteDtoApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/quotes/history": {
+      "get": {
+        "tags": [
+          "MT5 Market Data"
+        ],
+        "summary": "Get 1-minute price bars",
+        "description": "Without `date`: today's 1-minute bars. With `date`: one month of 1-minute bars ending on that day. Empty list when the broker has no data or does not answer within 60 s. Prices come from the broker of the given account, so symbol names follow that broker.",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "query",
+            "description": "Broker server name, case-insensitive. Example: ICMarketsSC-Demo.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "MT5 login number, digits only. Example: 52345678.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "description": "Symbol exactly as the broker names it, suffix included. Example: EURUSD.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "description": "Optional, YYYY-MM-DD. Returns the month of 1-minute bars ending on that day. Omit for today's bars.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BarDtoIReadOnlyListApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/sessions": {
+      "get": {
+        "tags": [
+          "MT5 Market Data"
+        ],
+        "summary": "Get trading hours of a symbol",
+        "description": "Quote and trade session windows per weekday ([0] = Sunday), in minutes since 00:00 broker server time. Prices come from the broker of the given account, so symbol names follow that broker.",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "query",
+            "description": "Broker server name, case-insensitive. Example: ICMarketsSC-Demo.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "MT5 login number, digits only. Example: 52345678.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "description": "Symbol exactly as the broker names it, suffix included. Example: EURUSD.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SymbolSessionsDtoApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/orders": {
+      "get": {
+        "tags": [
+          "MT5 Orders"
+        ],
+        "summary": "List open positions and pending orders",
+        "description": "Current open market positions and pending orders. Refreshed about once per second; empty while the account is offline.",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "query",
+            "description": "Broker server name, case-insensitive. Example: ICMarketsSC-Demo.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "MT5 login number, digits only. Example: 52345678.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mt5OpenOrdersDtoApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "MT5 Orders"
+        ],
+        "summary": "Open an order",
+        "description": "`type` market (default) executes now at the current price. `type` limit/stop places a pending order at `price`. Returns the new ticket. On failure `errors` carries the broker message; 409 = broker rejected it (market closed, not enough margin, ...).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mt5OrderRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mt5OrderTicketDtoApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/orders/history": {
+      "get": {
+        "tags": [
+          "MT5 Orders"
+        ],
+        "summary": "List closed orders",
+        "description": "Closed orders between `from` and `to` (default: last 30 days), plus balance operations (type deposit/withdrawal/credit). Queried live from the broker, so long ranges can take a few seconds.",
+        "parameters": [
+          {
+            "name": "server",
+            "in": "query",
+            "description": "Broker server name, case-insensitive. Example: ICMarketsSC-Demo.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "in": "query",
+            "description": "MT5 login number, digits only. Example: 52345678.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Optional start, ISO 8601 (UTC). Default: 30 days before 'to'.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Optional end, ISO 8601 (UTC). Default: now.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryOrderDtoIReadOnlyListApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/orders/modify": {
+      "put": {
+        "tags": [
+          "MT5 Orders"
+        ],
+        "summary": "Modify SL/TP or pending price",
+        "description": "Omitted `sl`/`tp` keep their current value; send 0 to remove one. `price` only applies to pending orders. On failure `errors` carries the broker message; 409 = broker rejected it (market closed, not enough margin, ...).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mt5OrderModifyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/orders/close": {
+      "post": {
+        "tags": [
+          "MT5 Orders"
+        ],
+        "summary": "Close a position or cancel a pending order",
+        "description": "Closes the full position, or only `volume` lots when given. On a pending order it cancels it. On failure `errors` carries the broker message; 409 = broker rejected it (market closed, not enough margin, ...).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mt5OrderCloseDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/orders/close-by": {
+      "post": {
+        "tags": [
+          "MT5 Orders"
+        ],
+        "summary": "Close a position by an opposite one",
+        "description": "Hedging accounts only: closes `ticket` against `byTicket` (same symbol, opposite side), saving one spread. On failure `errors` carries the broker message; 409 = broker rejected it (market closed, not enough margin, ...).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mt5OrderCloseByDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/orders/close-all": {
+      "post": {
+        "tags": [
+          "MT5 Orders"
+        ],
+        "summary": "Close everything on one account",
+        "description": "Closes every open position and cancels every pending order on this account, one by one. Always 200: check `ok` per ticket in `results`.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mt5AccountIdentityDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseAllAccountResultDtoApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/servers": {
+      "get": {
+        "tags": [
+          "MT5 Servers"
+        ],
+        "summary": "Search broker servers",
+        "description": "Looks up the public MT5 broker directory. Each company lists its servers with `name` (use it as `server` when adding an account) and `access` addresses.",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "description": "Part of a broker or server name. Example: icmarkets.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mt5BrokerCompanySearchRawDtoListApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/demo-accounts": {
+      "post": {
+        "tags": [
+          "MT5 Servers"
+        ],
+        "summary": "Create a demo account",
+        "description": "Asks a broker's demo server for a new demo account and returns its credentials. It is NOT added to the bridge: call POST /api/mt5/accounts with the returned login/password to use it. Many brokers disable this; a 502 then carries their reason.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Mt5DemoAccountRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mt5DemoAccountDtoApiResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mt5/tcp/info": {
+      "get": {
+        "tags": [
+          "MT5 Servers"
+        ],
+        "summary": "How to read the TCP copy feed",
+        "description": "Masters stream their trades on a raw TCP socket (not HTTP, not WebSocket). This tells you the port and handshake.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mt5TcpInfoDtoApiResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "description": "MT5 login number.",
+            "nullable": true
+          },
+          "server": {
+            "type": "string",
+            "description": "Server name as it was added (the identity, together with account_id).",
+            "nullable": true
+          },
+          "server_name": {
+            "type": "string",
+            "description": "Server name as the broker reports it once connected.",
+            "nullable": true
+          },
+          "is_live": {
+            "type": "boolean",
+            "description": "true = real account, false = demo, null = unknown yet.",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "description": "Copy role: pending, master or slave.",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "description": "online or offline.",
+            "nullable": true
+          },
+          "reconnect_type": {
+            "type": "string",
+            "description": "While offline: retry_connect (retrying every few seconds) or invalid_credentials (retrying every 15 min).",
+            "nullable": true
+          },
+          "tcp_path": {
+            "type": "string",
+            "description": "\":{port}/mt5/{server-without-spaces}/{accountId}\" on the TCP copy feed. Prefix with the bridge host for a slave's masterTcpUrl.",
+            "nullable": true
+          },
+          "balance": {
+            "type": "number",
+            "description": "Balance in account currency.",
+            "format": "double",
+            "nullable": true
+          },
+          "equity": {
+            "type": "number",
+            "description": "Equity.",
+            "format": "double",
+            "nullable": true
+          },
+          "pnl": {
+            "type": "number",
+            "description": "Floating PnL (equity - balance).",
+            "format": "double",
+            "nullable": true
+          },
+          "open_orders": {
+            "type": "integer",
+            "description": "Number of open positions.",
+            "format": "int32"
+          },
+          "pending_orders": {
+            "type": "integer",
+            "description": "Number of pending orders.",
+            "format": "int32"
+          },
+          "open_positions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenPositionDto"
+            },
+            "description": "Open positions.",
+            "nullable": true
+          },
+          "pending_order_list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingOrderDto"
+            },
+            "description": "Pending orders.",
+            "nullable": true
+          },
+          "copyTradingConfig": {
+            "$ref": "#/components/schemas/CopyTradingConfigDto"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Full state of one account as the back office shows it."
+      },
+      "AccountSnapshotDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/AccountSnapshotDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "AccountSnapshotDtoListApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountSnapshotDto"
+            },
+            "description": "The payload. null on errors and on actions that return nothing.",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "BarDto": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "integer",
+            "description": "Bar open time, unix seconds (broker server time).",
+            "format": "int64"
+          },
+          "open": {
+            "type": "number",
+            "description": "Open price.",
+            "format": "double"
+          },
+          "high": {
+            "type": "number",
+            "description": "High price.",
+            "format": "double"
+          },
+          "low": {
+            "type": "number",
+            "description": "Low price.",
+            "format": "double"
+          },
+          "close": {
+            "type": "number",
+            "description": "Close price.",
+            "format": "double"
+          },
+          "tick_volume": {
+            "type": "integer",
+            "description": "Number of ticks in the bar.",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false,
+        "description": "One 1-minute OHLC bar."
+      },
+      "BarDtoIReadOnlyListApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BarDto"
+            },
+            "description": "The payload. null on errors and on actions that return nothing.",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "CloseAllAccountResultDto": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "description": "MT5 login number.",
+            "nullable": true
+          },
+          "server": {
+            "type": "string",
+            "description": "Server name.",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "description": "Copy role: pending, master or slave.",
+            "nullable": true
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CloseOrderResultDto"
+            },
+            "description": "Per-ticket results. Empty when nothing was open.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Close-all outcome for one account: one entry per ticket it tried to close."
+      },
+      "CloseAllAccountResultDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/CloseAllAccountResultDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "CloseOrderResultDto": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "integer",
+            "description": "Position or pending order ticket.",
+            "format": "int64"
+          },
+          "ok": {
+            "type": "boolean",
+            "description": "Whether the broker accepted the close."
+          },
+          "error_code": {
+            "type": "string",
+            "description": "On failure: disconnected, timeout, not_found, market_closed, insufficient_margin, invalid_volume, invalid_symbol, rejected or unknown_error.",
+            "nullable": true
+          },
+          "broker_message": {
+            "type": "string",
+            "description": "On failure: the broker's own message, when there is one.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Outcome of closing one ticket."
+      },
+      "CopyTradingConfigDto": {
+        "type": "object",
+        "properties": {
+          "copyEnabled": {
+            "type": "boolean",
+            "description": "Master switch. false pauses copying without changing the role.",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "description": "\"pending\" (default, not copying), \"master\" or \"slave\".",
+            "nullable": true
+          },
+          "masterTcpUrl": {
+            "type": "string",
+            "description": "Slave only. \"{bridgeHost}{master tcp_path}\", e.g. \"1.2.3.4:7779/mt5/ICMarketsSC-Demo/52345678\".",
+            "nullable": true
+          },
+          "lotType": {
+            "type": "string",
+            "description": "Slave only. \"multiplier\" (master lots x lotMultiplier) or \"fixed\" (always fixedLot).",
+            "nullable": true
+          },
+          "lotMultiplier": {
+            "type": "number",
+            "description": "Slave only. Factor applied to the master's lots when lotType is \"multiplier\". Example: 0.5.",
+            "format": "double",
+            "nullable": true
+          },
+          "fixedLot": {
+            "type": "number",
+            "description": "Slave only. Lots used for every copy when lotType is \"fixed\". Example: 0.01.",
+            "format": "double",
+            "nullable": true
+          },
+          "reverseTrading": {
+            "type": "boolean",
+            "description": "Slave only. true opens the opposite side of every master trade.",
+            "nullable": true
+          },
+          "prefix": {
+            "$ref": "#/components/schemas/PrefixSuffixConfigDto"
+          },
+          "suffix": {
+            "$ref": "#/components/schemas/PrefixSuffixConfigDto"
+          },
+          "symbolTranslations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Slave only. \"MASTER:SLAVE\" pairs, e.g. [\"XAUUSD:GOLD\"]. A match wins over prefix/suffix.",
+            "nullable": true
+          },
+          "exactMatch": {
+            "type": "boolean",
+            "description": "Slave only. true closes any slave order that is not a copy of a live master order.",
+            "nullable": true
+          },
+          "noTradeTag": {
+            "type": "boolean",
+            "description": "Slave only. true leaves copies untagged (no master ticket in comment/magic).",
+            "nullable": true
+          },
+          "copyPendingOrders": {
+            "type": "boolean",
+            "description": "Slave only. Copy limit/stop orders too, not just market positions. Default true.",
+            "nullable": true
+          },
+          "copySlTp": {
+            "type": "boolean",
+            "description": "Slave only. Copy stop loss / take profit. Default true.",
+            "nullable": true
+          },
+          "symbolFilterMode": {
+            "type": "string",
+            "description": "Slave only. \"off\" (copy every symbol), \"allow\" (only symbolFilterList) or \"block\" (all except symbolFilterList).",
+            "nullable": true
+          },
+          "symbolFilterList": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Slave only. Symbols for symbolFilterMode; a master symbol matches when it contains an entry (case-insensitive).",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Copy-trading settings of an account. A \"master\" publishes its trades on the TCP feed; a\r\n\"slave\" mirrors one master; \"pending\" does neither (default). Slave-only fields are\r\nignored for other roles."
+      },
+      "HistoryOrderDto": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "integer",
+            "description": "Order ticket.",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Symbol. Empty on balance operations.",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "description": "market, limit, stop, stop_limit, or deposit / withdrawal / credit for balance operations.",
+            "nullable": true
+          },
+          "side": {
+            "type": "string",
+            "description": "buy or sell. Empty on balance operations.",
+            "nullable": true
+          },
+          "volume": {
+            "type": "number",
+            "description": "Lots.",
+            "format": "double"
+          },
+          "open_price": {
+            "type": "number",
+            "description": "Entry price.",
+            "format": "double"
+          },
+          "close_price": {
+            "type": "number",
+            "description": "Exit price.",
+            "format": "double"
+          },
+          "open_time": {
+            "type": "integer",
+            "description": "Open time, unix seconds.",
+            "format": "int64"
+          },
+          "close_time": {
+            "type": "integer",
+            "description": "Close time, unix seconds.",
+            "format": "int64"
+          },
+          "profit": {
+            "type": "number",
+            "description": "Gross profit in account currency (amount for balance operations).",
+            "format": "double"
+          },
+          "swap": {
+            "type": "number",
+            "description": "Swap charged.",
+            "format": "double"
+          },
+          "commission": {
+            "type": "number",
+            "description": "Commission charged.",
+            "format": "double"
+          },
+          "magic": {
+            "type": "integer",
+            "description": "Expert/magic number, 0 when none.",
+            "format": "int64",
+            "nullable": true
+          },
+          "copy_tag_master_ticket": {
+            "type": "integer",
+            "description": "When this was a copied order: the master ticket it copied.",
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "One closed order, or a balance operation (deposit/withdrawal/credit)."
+      },
+      "HistoryOrderDtoIReadOnlyListApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryOrderDto"
+            },
+            "description": "The payload. null on errors and on actions that return nothing.",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "Mt5AccessEndpointDto": {
+        "type": "object",
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "\"host:port\" or \"host\" (port 443 assumed).",
+            "nullable": true
+          },
+          "server_label": {
+            "type": "string",
+            "description": "Server name this address belongs to.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A broker address to connect to, with its server label."
+      },
+      "Mt5AccountConfigDto": {
+        "required": [
+          "accountId",
+          "copyTradingConfig",
+          "server"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "minLength": 1,
+            "type": "string",
+            "description": "MT5 login number, digits only."
+          },
+          "server": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Broker server name."
+          },
+          "copyTradingConfig": {
+            "$ref": "#/components/schemas/CopyTradingConfigDto"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Replaces the copy-trading config of an existing account."
+      },
+      "Mt5AccountIdentityDto": {
+        "required": [
+          "accountId",
+          "server"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "minLength": 1,
+            "type": "string",
+            "description": "MT5 login number, digits only. Example: \"52345678\"."
+          },
+          "server": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Broker server name exactly as MT5 shows it. Case-insensitive; leading/trailing spaces are trimmed. Example: \"ICMarketsSC-Demo\"."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Identifies one account on this bridge."
+      },
+      "Mt5AccountInfoDto": {
+        "type": "object",
+        "properties": {
+          "server_name": {
+            "type": "string",
+            "description": "Server name as the broker reports it, null while never connected.",
+            "nullable": true
+          },
+          "is_live": {
+            "type": "boolean",
+            "description": "true = real account, false = demo, null = unknown yet.",
+            "nullable": true
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "Whether the broker connection is up right now."
+          },
+          "balance": {
+            "type": "number",
+            "description": "Balance in account currency.",
+            "format": "double",
+            "nullable": true
+          },
+          "equity": {
+            "type": "number",
+            "description": "Equity (balance + floating PnL).",
+            "format": "double",
+            "nullable": true
+          },
+          "unrealized_pnl": {
+            "type": "number",
+            "description": "Floating PnL of open positions (equity - balance).",
+            "format": "double",
+            "nullable": true
+          },
+          "open_count": {
+            "type": "integer",
+            "description": "Number of open market positions.",
+            "format": "int32"
+          },
+          "pending_count": {
+            "type": "integer",
+            "description": "Number of pending orders.",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Live money figures of an account (refreshed about every second)."
+      },
+      "Mt5AccountInfoDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/Mt5AccountInfoDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "Mt5AccountUpsertDto": {
+        "required": [
+          "accountId",
+          "server"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "minLength": 1,
+            "type": "string",
+            "description": "MT5 login number, digits only."
+          },
+          "server": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Broker server name exactly as MT5 shows it. Search it with GET /api/mt5/servers."
+          },
+          "password": {
+            "type": "string",
+            "description": "Master or investor password. Required for a new account. For an existing account, omit it to change only the config; send it to reconnect with a new password.",
+            "nullable": true
+          },
+          "access_addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional \"host:port\" list to connect to directly. When omitted, addresses are resolved from the server name.",
+            "nullable": true
+          },
+          "access_endpoints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mt5AccessEndpointDto"
+            },
+            "description": "Optional, like access_addresses but each address carries its server label. Takes precedence over access_addresses.",
+            "nullable": true
+          },
+          "copyTradingConfig": {
+            "$ref": "#/components/schemas/CopyTradingConfigDto"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Adds an account to the bridge (connecting it), or updates an existing one."
+      },
+      "Mt5AccountUpsertResultDto": {
+        "type": "object",
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "description": "MT5 login number.",
+            "nullable": true
+          },
+          "server": {
+            "type": "string",
+            "description": "Server name, normalized.",
+            "nullable": true
+          },
+          "tcp_path": {
+            "type": "string",
+            "description": "\":{port}/mt5/{server-without-spaces}/{accountId}\". Prefix it with this bridge's host to get a slave's masterTcpUrl.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Result of adding/updating an account."
+      },
+      "Mt5AccountUpsertResultDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/Mt5AccountUpsertResultDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "Mt5BrokerCompanySearchRawDto": {
+        "type": "object",
+        "properties": {
+          "company_label": {
+            "type": "string",
+            "nullable": true
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mt5BrokerServerEntryRawDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Mt5BrokerCompanySearchRawDtoListApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Mt5BrokerCompanySearchRawDto"
+            },
+            "description": "The payload. null on errors and on actions that return nothing.",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "Mt5BrokerServerEntryRawDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "access": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Mt5DemoAccountDto": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "integer",
+            "description": "New login number.",
+            "format": "int64"
+          },
+          "password": {
+            "type": "string",
+            "description": "Master (trading) password.",
+            "nullable": true
+          },
+          "investor_password": {
+            "type": "string",
+            "description": "Investor (read-only) password.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Credentials of a freshly created demo account."
+      },
+      "Mt5DemoAccountDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/Mt5DemoAccountDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "Mt5DemoAccountRequestDto": {
+        "required": [
+          "host"
+        ],
+        "type": "object",
+        "properties": {
+          "host": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Demo server address (IP or hostname), taken from the access list in GET /api/mt5/servers."
+          },
+          "port": {
+            "type": "integer",
+            "description": "Demo server port. Default 443.",
+            "format": "int32"
+          },
+          "userName": {
+            "type": "string",
+            "description": "Account holder name.",
+            "nullable": true
+          },
+          "accType": {
+            "type": "string",
+            "description": "Account group type the broker expects. Default \"demo\".",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "description": "Country of the holder.",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "description": "City of the holder.",
+            "nullable": true
+          },
+          "state": {
+            "type": "string",
+            "description": "State/province of the holder.",
+            "nullable": true
+          },
+          "zipCode": {
+            "type": "string",
+            "description": "Postal code of the holder.",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "description": "Street address of the holder.",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "description": "Phone, international format. Example: \"+15551234567\".",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "description": "Email of the holder.",
+            "nullable": true
+          },
+          "companyName": {
+            "type": "string",
+            "description": "Broker company name, as listed in GET /api/mt5/servers.",
+            "nullable": true
+          },
+          "deposit": {
+            "type": "number",
+            "description": "Starting demo balance in account currency. Default 10000.",
+            "format": "double"
+          },
+          "leverage": {
+            "type": "integer",
+            "description": "Leverage, e.g. 100 for 1:100. Omit to use the broker default.",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Requests a new demo account from a broker's demo server. Does not add it to the bridge."
+      },
+      "Mt5OpenOrdersDto": {
+        "type": "object",
+        "properties": {
+          "open_positions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenPositionDto"
+            },
+            "description": "Open market positions.",
+            "nullable": true
+          },
+          "pending_orders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PendingOrderDto"
+            },
+            "description": "Pending (limit/stop) orders.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Everything currently open on an account."
+      },
+      "Mt5OpenOrdersDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/Mt5OpenOrdersDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "Mt5OrderCloseByDto": {
+        "required": [
+          "accountId",
+          "byTicket",
+          "server",
+          "ticket"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "minLength": 1,
+            "type": "string",
+            "description": "MT5 login number, digits only."
+          },
+          "server": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Broker server name."
+          },
+          "ticket": {
+            "type": "integer",
+            "description": "Ticket of the position to close.",
+            "format": "int64"
+          },
+          "byTicket": {
+            "type": "integer",
+            "description": "Ticket of the opposite position (same symbol, other side) it is closed against.",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Closes one position against an opposite one on the same symbol (hedging accounts only)."
+      },
+      "Mt5OrderCloseDto": {
+        "required": [
+          "accountId",
+          "server",
+          "ticket"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "minLength": 1,
+            "type": "string",
+            "description": "MT5 login number, digits only."
+          },
+          "server": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Broker server name."
+          },
+          "ticket": {
+            "type": "integer",
+            "description": "Ticket of the position or pending order.",
+            "format": "int64"
+          },
+          "volume": {
+            "type": "number",
+            "description": "Lots to close. Omit (or 0) to close everything. Partial close applies to market positions only.",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Closes an open position (fully or partially) or cancels a pending order."
+      },
+      "Mt5OrderModifyDto": {
+        "required": [
+          "accountId",
+          "server",
+          "ticket"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "minLength": 1,
+            "type": "string",
+            "description": "MT5 login number, digits only."
+          },
+          "server": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Broker server name."
+          },
+          "ticket": {
+            "type": "integer",
+            "description": "Ticket of the position or pending order (see GET /api/mt5/orders).",
+            "format": "int64"
+          },
+          "sl": {
+            "type": "number",
+            "description": "New stop loss. Omit to keep the current one, 0 to remove it.",
+            "format": "double",
+            "nullable": true
+          },
+          "tp": {
+            "type": "number",
+            "description": "New take profit. Omit to keep the current one, 0 to remove it.",
+            "format": "double",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "description": "Pending orders only: new entry price. Ignored for open positions.",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Changes SL/TP of an open position or pending order, and the entry price of a pending order."
+      },
+      "Mt5OrderRequestDto": {
+        "required": [
+          "accountId",
+          "server",
+          "side",
+          "symbol",
+          "volume"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "minLength": 1,
+            "type": "string",
+            "description": "MT5 login number, digits only."
+          },
+          "server": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Broker server name."
+          },
+          "symbol": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Symbol exactly as the broker names it (suffixes included). Example: \"EURUSD\" or \"XAUUSD.r\"."
+          },
+          "side": {
+            "minLength": 1,
+            "type": "string",
+            "description": "\"buy\" or \"sell\"."
+          },
+          "volume": {
+            "type": "number",
+            "description": "Lots, must be greater than 0 and respect the symbol's min/step. Example: 0.01.",
+            "format": "double"
+          },
+          "type": {
+            "type": "string",
+            "description": "\"market\" (default when omitted), \"limit\" or \"stop\".",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "description": "Entry price for limit/stop. Ignored for market. When omitted on a pending order, the current ask (buy) or bid (sell) is used.",
+            "format": "double",
+            "nullable": true
+          },
+          "sl": {
+            "type": "number",
+            "description": "Stop loss price. Omit or 0 for none.",
+            "format": "double",
+            "nullable": true
+          },
+          "tp": {
+            "type": "number",
+            "description": "Take profit price. Omit or 0 for none.",
+            "format": "double",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Opens a market order, or places a pending (limit/stop) order."
+      },
+      "Mt5OrderTicketDto": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "integer",
+            "description": "Ticket the broker assigned to the new position or pending order.",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Result of a successful order send."
+      },
+      "Mt5OrderTicketDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/Mt5OrderTicketDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "Mt5TcpInfoDto": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "integer",
+            "description": "TCP port the feed listens on.",
+            "format": "int32",
+            "nullable": true
+          },
+          "handshake_format": {
+            "type": "string",
+            "description": "First line a client sends after connecting.",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "description": "What the feed sends back.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "How to subscribe to the raw TCP copy-trading feed."
+      },
+      "Mt5TcpInfoDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/Mt5TcpInfoDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "ObjectApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "description": "The payload. null on errors and on actions that return nothing.",
+            "nullable": true
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "OpenPositionDto": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "integer",
+            "description": "Position ticket. Use it to modify or close.",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Symbol.",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "description": "Always \"market\".",
+            "nullable": true
+          },
+          "side": {
+            "type": "string",
+            "description": "buy or sell.",
+            "nullable": true
+          },
+          "volume": {
+            "type": "number",
+            "description": "Lots.",
+            "format": "double"
+          },
+          "open_price": {
+            "type": "number",
+            "description": "Entry price.",
+            "format": "double"
+          },
+          "sl": {
+            "type": "number",
+            "description": "Stop loss, null when none.",
+            "format": "double",
+            "nullable": true
+          },
+          "tp": {
+            "type": "number",
+            "description": "Take profit, null when none.",
+            "format": "double",
+            "nullable": true
+          },
+          "open_time": {
+            "type": "integer",
+            "description": "Open time, unix seconds.",
+            "format": "int64"
+          },
+          "age_seconds": {
+            "type": "integer",
+            "description": "Seconds since it opened.",
+            "format": "int64"
+          },
+          "profit": {
+            "type": "number",
+            "description": "Floating profit in account currency.",
+            "format": "double"
+          },
+          "swap": {
+            "type": "number",
+            "description": "Accumulated swap.",
+            "format": "double"
+          },
+          "commission": {
+            "type": "number",
+            "description": "Commission charged.",
+            "format": "double"
+          },
+          "magic": {
+            "type": "integer",
+            "description": "Expert/magic number; falls back to the ticket when the order has none.",
+            "format": "int64",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "An open market position."
+      },
+      "PendingOrderDto": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "integer",
+            "description": "Order ticket. Use it to modify or cancel (close).",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Symbol.",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "description": "limit, stop or stop_limit.",
+            "nullable": true
+          },
+          "side": {
+            "type": "string",
+            "description": "buy or sell.",
+            "nullable": true
+          },
+          "volume": {
+            "type": "number",
+            "description": "Lots.",
+            "format": "double"
+          },
+          "price": {
+            "type": "number",
+            "description": "Trigger price.",
+            "format": "double"
+          },
+          "sl": {
+            "type": "number",
+            "description": "Stop loss, null when none.",
+            "format": "double",
+            "nullable": true
+          },
+          "tp": {
+            "type": "number",
+            "description": "Take profit, null when none.",
+            "format": "double",
+            "nullable": true
+          },
+          "expire": {
+            "type": "integer",
+            "description": "Expiration, unix seconds. Not reported for MT5 (always null).",
+            "format": "int64",
+            "nullable": true
+          },
+          "magic": {
+            "type": "integer",
+            "description": "Expert/magic number; falls back to the ticket when the order has none.",
+            "format": "int64",
+            "nullable": true
+          },
+          "reduce_only": {
+            "type": "boolean",
+            "description": "Copy-feed flag; not used by MT5 orders.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "A pending (limit/stop) order waiting to trigger."
+      },
+      "PrefixSuffixConfigDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this rewrite is active."
+          },
+          "value": {
+            "type": "string",
+            "description": "The text to add or remove, e.g. \".r\".",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "description": "\"add\" or \"remove\".",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Symbol prefix/suffix rewrite applied when copying."
+      },
+      "QuoteDto": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Symbol name.",
+            "nullable": true
+          },
+          "bid": {
+            "type": "number",
+            "description": "Best bid (sell price).",
+            "format": "double"
+          },
+          "ask": {
+            "type": "number",
+            "description": "Best ask (buy price).",
+            "format": "double"
+          },
+          "last": {
+            "type": "number",
+            "description": "Last traded price (0 on most forex symbols).",
+            "format": "double"
+          },
+          "volume": {
+            "type": "integer",
+            "description": "Tick volume.",
+            "format": "int64"
+          },
+          "time": {
+            "type": "integer",
+            "description": "Tick time, unix seconds (broker server time).",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Latest tick of a symbol."
+      },
+      "QuoteDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/QuoteDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      },
+      "SessionIntervalDto": {
+        "type": "object",
+        "properties": {
+          "start_minutes": {
+            "type": "integer",
+            "description": "Start, minutes since 00:00. Example: 60 = 01:00.",
+            "format": "int32"
+          },
+          "end_minutes": {
+            "type": "integer",
+            "description": "End, minutes since 00:00. 1440 = end of day.",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "A session window inside one weekday, in minutes since 00:00 broker server time."
+      },
+      "SymbolSessionsDto": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "Symbol name.",
+            "nullable": true
+          },
+          "quote_sessions_by_day": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SessionIntervalDto"
+              }
+            },
+            "description": "When prices stream, per weekday. Empty list = no quotes that day.",
+            "nullable": true
+          },
+          "trade_sessions_by_day": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SessionIntervalDto"
+              }
+            },
+            "description": "When orders are accepted, per weekday. Empty list = market closed that day.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Quote and trade session windows of a symbol, indexed by weekday: [0] = Sunday ... [6] = Saturday."
+      },
+      "SymbolSessionsDtoApiResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "true when the request worked."
+          },
+          "data": {
+            "$ref": "#/components/schemas/SymbolSessionsDto"
+          },
+          "message": {
+            "type": "string",
+            "description": "\"OK\" on success.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Human-readable error messages, only on failure.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Envelope of every JSON response: success + data on 2xx, success=false + errors otherwise."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "MT5 Accounts"
+    },
+    {
+      "name": "MT5 Orders"
+    },
+    {
+      "name": "MT5 Market Data"
+    },
+    {
+      "name": "MT5 Servers"
+    }
+  ]
+}

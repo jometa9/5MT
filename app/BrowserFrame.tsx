@@ -40,16 +40,21 @@ function useBackgroundTabs() {
   ];
 }
 
+export type Tab = { title: string; icon: string };
+
 export default function BrowserFrame({
-  tabTitle,
+  tabs,
+  active,
   url,
   children,
 }: {
-  tabTitle: string;
+  tabs: Tab[];
+  active: number;
   url: string;
   children: React.ReactNode;
 }) {
-  const backgroundTabs = useBackgroundTabs();
+  const allTabs = [...tabs, ...useBackgroundTabs()];
+  const last = allTabs.length - 1;
 
   return (
     <div className="bf" dir="ltr">
@@ -62,39 +67,45 @@ export default function BrowserFrame({
         <span className="bf-tabSearch">
           <ChevronDown aria-hidden />
         </span>
-        <span className="bf-tab bf-tabActive">
-          <span
-            aria-hidden
-            className="bf-curve"
-            style={{
-              left: -TAB_CURVE, width: TAB_CURVE, height: TAB_CURVE,
-              background: `radial-gradient(circle at 0 0, transparent ${TAB_CURVE}px, var(--chrome-toolbar) ${TAB_CURVE}px)`,
-            }}
-          />
-          <span
-            aria-hidden
-            className="bf-curve"
-            style={{
-              right: -TAB_CURVE, width: TAB_CURVE, height: TAB_CURVE,
-              background: `radial-gradient(circle at 100% 0, transparent ${TAB_CURVE}px, var(--chrome-toolbar) ${TAB_CURVE}px)`,
-            }}
-          />
-          <TabIcon src={process.env.BASE_PATH + "/cube.svg"} />
-          <span className="bf-tabTitle">{tabTitle}</span>
-          <X className="bf-tabClose" aria-hidden />
-        </span>
-        {backgroundTabs.map((tab, index) => (
-          <span key={tab.icon} className="bf-tabSlot">
-            {index > 0 ? <span aria-hidden className="bf-sep" /> : null}
-            <span className="bf-tab">
+        {allTabs.map((tab, index) =>
+          index === active ? (
+            <span key={tab.title} className="bf-tab bf-tabActive">
+              <span
+                aria-hidden
+                className="bf-curve"
+                style={{
+                  left: -TAB_CURVE, width: TAB_CURVE, height: TAB_CURVE,
+                  background: `radial-gradient(circle at 0 0, transparent ${TAB_CURVE}px, var(--chrome-toolbar) ${TAB_CURVE}px)`,
+                }}
+              />
+              <span
+                aria-hidden
+                className="bf-curve"
+                style={{
+                  right: -TAB_CURVE, width: TAB_CURVE, height: TAB_CURVE,
+                  background: `radial-gradient(circle at 100% 0, transparent ${TAB_CURVE}px, var(--chrome-toolbar) ${TAB_CURVE}px)`,
+                }}
+              />
               <TabIcon src={tab.icon} />
               <span className="bf-tabTitle">{tab.title}</span>
+              <X className="bf-tabClose" aria-hidden />
             </span>
+          ) : (
+            // Like Chrome: a separator between two inactive tabs, never next to the active one.
+            <span key={tab.icon} className="bf-tabSlot">
+              {index > 0 && index - 1 !== active ? <span aria-hidden className="bf-sep" /> : null}
+              <span className="bf-tab">
+                <TabIcon src={tab.icon} />
+                <span className="bf-tabTitle">{tab.title}</span>
+              </span>
+            </span>
+          ),
+        )}
+        {active !== last ? (
+          <span className="bf-tabSlot">
+            <span aria-hidden className="bf-sep" />
           </span>
-        ))}
-        <span className="bf-tabSlot">
-          <span aria-hidden className="bf-sep" />
-        </span>
+        ) : null}
         <Plus className="bf-newTab" aria-hidden />
       </div>
       <div className="bf-toolbar">
